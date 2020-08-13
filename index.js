@@ -89,7 +89,7 @@ async function detectChanges(server) {
         encoding: "utf-8"
       });
 
-      git.add(".", () => {
+      git.add(".", function()  {
         console.log('add함', arguments)
       }).commit(`commit - ${newProcName}`).push("origin", "master", ['--force']);
 
