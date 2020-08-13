@@ -1,0 +1,1143 @@
+
+  CREATE OR REPLACE PACKAGE "CISADM"."CM_B912S_PKG" IS
+/**
+================================================================================
+PROGRAM NAME     : CM_B912S_PKG
+CREATED BY       : 김일영
+CREATED DATE     : 2020-07-16
+LAST UPDATED BY  : 김일영
+LAST UPDATE DATE :
+PURPOSE          :  홈페이지,모바일 혹은 voc로 통해 접수된 부가세정보등록 요청에 대한 통합
+VERSION          : 1.0
+COMMENT          : 홈페이지,모바일 혹은 voc로 통해 접수된 부가세정보등록 요청에 대한 통합
+================================================================================
+CHANGE HISTORY
+--------------------------------------------------------------------------------
+DATE        NAME          DESCRIPTION
+----------- ------------  ------------------------------------------------------
+2012-01-17  김일영 최종작성
+================================================================================
+**/
+TYPE CSR_TYPE IS REF CURSOR;
+
+/*================================================================================
+PROGRAM NAME     : main_query
+CREATED BY       : 김일영
+CREATED DATE     : 2020-07-16
+LAST UPDATED BY  : 김일영
+LAST UPDATE DATE :
+PURPOSE          : 홈페이지,모바일 혹은 voc로 통해 접수된 부가세정보등록 요청에 대한 조회(리스트)
+VERSION          : 1.0
+COMMENT          : 홈페이지,모바일 혹은 voc로 통해 접수된 부가세정보등록 요청에 대한 조회(리스트)
+================================================================================*/
+
+PROCEDURE main_query(
+
+       O_CSR            OUT CSR_TYPE,
+       O_ERR            OUT VARCHAR2,
+       V_USERID         IN  VARCHAR2,   -- 필수 : 사용자 아이디
+       V_LANG           IN  VARCHAR2,   -- 필수 : 시스템 언어
+       V_IP             IN  VARCHAR2,   -- 필수 : 사용자 IP
+       p_center_cd      IN  CHAR,--센터코드
+       p_receipt_date_from   IN VARCHAR2, --접수일자시작
+       p_receipt_date_to     IN VARCHAR2,
+       p_statusFlg           IN CHAR      -- 처리여부
+         
+       ) ;
+/*================================================================================
+PROGRAM NAME     : sub_query
+CREATED BY       : 김일영
+CREATED DATE     : 2020-07-16
+LAST UPDATED BY  : 김일영
+LAST UPDATE DATE :
+PURPOSE          : 홈페이지,모바일 혹은 voc로 통해 접수된 부가세정보등록 요청에 대한 조회(리스트클릭시)
+VERSION          : 1.0
+COMMENT          : 홈페이지,모바일 혹은 voc로 통해 접수된 부가세정보등록 요청에 대한 조회(리스트클릭시)
+================================================================================*/
+PROCEDURE sub_query(
+
+       O_CSR            OUT CSR_TYPE,
+       O_ERR            OUT VARCHAR2,
+       V_USERID         IN  VARCHAR2,   -- 필수 : 사용자 아이디
+       V_LANG           IN  VARCHAR2,   -- 필수 : 시스템 언어
+       V_IP             IN  VARCHAR2,   -- 필수 : 사용자 IP
+       p_doc_receipt_id      IN  CHAR,--문서접수ID
+       p_tax_acpt_chnl_flg   IN VARCHAR2, --접수채널
+       p_acct_id             IN CHAR --변경납부자ID
+         
+       );       
+
+/*================================================================================
+PROGRAM NAME     : approval_request_u
+CREATED BY       : 김일영
+CREATED DATE     : 2014-08-21
+LAST UPDATED BY  : 김일영
+LAST UPDATE DATE :
+PURPOSE          : 접수된 건에 대해 부사게 신청정보를 Insert하고 신청정보를 완료한다.
+VERSION          : 1.0
+COMMENT          : 접수된 건에 대해 부사게 신청정보를 Insert하고 신청정보를 완료한다.
+
+=======================================================================================*/
+procedure approval_request
+           (
+             O_CSR         OUT CSR_TYPE,
+             O_ERR OUT VARCHAR2,
+             V_USERID      IN  VARCHAR2,   -- 필수 : 사용자 아이디
+             V_LANG        IN  VARCHAR2,   -- 필수 : 시스템 언어
+             V_IP          IN  VARCHAR2,   -- 필수 : 사용자 IP
+             p_doc_receipt_id      IN  VARCHAR2,--문서접수ID
+             p_tax_acpt_chnl_flg   IN VARCHAR2, --접수채널
+             p_acctid      in  varchar2,  -- 납부자
+             p_sinchung    in  varchar2,  -- 신청구분
+             p_bizcode     in  varchar2,  -- 사업자번호
+             p_sangho      in  varchar2,  -- 상호
+             p_saupgubun   in  varchar2,  -- 사업자 구분
+             p_upjong      in  varchar2,  -- 업종
+             p_uptae       in  varchar2,  -- 업태
+             p_boss        in  varchar2,  -- 대표자
+             p_bubinno     in  varchar2,  -- 법인 주민번호
+             p_jubsu       in  varchar2,  -- 접수자
+             p_jubsudept   in  varchar2,  -- 접수자소속
+             p_jubsudt     in  varchar2,  -- 접수일
+             p_bubinnm     in  varchar2,  -- 법인명
+             p_changeacct  in  varchar2,  -- 변경납부자
+             p_changeper   in  varchar2,  -- 변경납부자 perid
+             p_saupsdt     in  varchar2,  -- 사업게시일
+             p_toacceptym  in  varchar2,  -- 적용년월to
+             p_chnl_flg    in  varchar2, --채널구분
+             p_saupsoje    in  varchar2, --사업소재지
+             p_bonjumsoje  in  varchar2, --본점소재지
+             p_bigo        in  varchar2,  -- 비고
+             p_cmseq       in  varchar2,  -- cm_seq(안씀)
+             p_filegrp_id  in  varchar2,
+             p_jongsaup    in  varchar2,   -- 종사업장
+             p_buyer_name         in  varchar2,    -- varchar2(30)   공급받는자담당자명  
+             p_buyer_fax          in  varchar2,    -- varchar2(20)   공급받는자fax번호        
+             p_buyer_email        in  varchar2,    -- varchar2(40)   공급받는자담당자이메일 
+             p_buyer_maildomain   in  varchar2,    -- varchar2(40)   공급받는자담당자이메일        
+             p_buyer_mobile       in  varchar2,    -- varchar2(20)   공급받는자담당자휴대폰번호              
+             p_buyer_tel          in  varchar2,    -- varchar2(20)   공급받는자담당자전화번호 
+             p_file_name          in  VARCHAR2,    -- 파일명 
+             p_file_size          in  VARCHAR2     -- 파일사이즈
+             );      
+             
+
+/*================================================================================
+PROGRAM NAME     : file_upload
+CREATED BY       : 김일영
+CREATED DATE     : 2014-08-21
+LAST UPDATED BY  : 김일영
+LAST UPDATE DATE :
+PURPOSE          : 파일 업로드시 테이블 삽입
+VERSION          : 1.0
+COMMENT          : 파일 업로드시 테이블 삽입
+
+
+
+
+=======================================================================================*/
+
+PROCEDURE file_upload(
+O_CSR         OUT CSR_TYPE,
+O_ERR         OUT VARCHAR,
+V_USERID      IN  CHAR,
+V_LANG        IN  CHAR,
+V_IP          IN  CHAR,
+V_GRPID       IN  CHAR,   -- grpid
+V_READFNM     IN  CHAR,   -- 사용자 파일명
+V_SERVFNM     IN  CHAR,   -- 서버보관명
+V_FSIZE       IN  CHAR,    -- 사이즈
+V_SRC_TB      IN  CHAR,
+V_SRC_COL     IN  CHAR
+);                    
+/*================================================================================
+PROGRAM NAME     : file_del
+CREATED BY       : 김일영
+CREATED DATE     : 2020-07-15
+LAST UPDATED BY  : 김일영
+LAST UPDATE DATE :
+PURPOSE          : 파일 업로드된 파일삭제
+VERSION          : 1.0
+COMMENT          : 파일 업로드된 파일삭제
+
+
+
+
+=======================================================================================*/
+PROCEDURE file_del(
+O_CSR         OUT CSR_TYPE,
+O_ERR         OUT VARCHAR,
+V_USERID      IN  CHAR,
+V_LANG        IN  CHAR,
+V_IP          IN  CHAR,
+V_FILEID      IN  CHAR   -- file id
+);             
+/*================================================================================
+PROGRAM NAME     : complete_no_reg_u
+CREATED BY       : 김일영
+CREATED DATE     : 2020-07-15
+LAST UPDATED BY  : 김일영
+LAST UPDATE DATE :
+PURPOSE          : 미등록건으로 완료처일한다.
+VERSION          : 1.0
+COMMENT          : 미등록건으로 완료처일한다.
+
+
+
+
+=======================================================================================*/
+procedure complete_no_reg
+           (
+             O_CSR         OUT CSR_TYPE,
+             O_ERR OUT VARCHAR2,
+             V_USERID      IN  VARCHAR2,   -- 필수 : 사용자 아이디
+             V_LANG        IN  VARCHAR2,   -- 필수 : 시스템 언어
+             V_IP          IN  VARCHAR2,   -- 필수 : 사용자 IP
+             p_doc_receipt_id      IN  CHAR,--문서접수ID
+             p_tax_acpt_chnl_flg   IN VARCHAR2); --접수채널
+                                                                                                                                          
+                                                                                                                                          
+END ;
+
+CREATE OR REPLACE PACKAGE BODY "CISADM"."CM_B912S_PKG" IS
+/**
+================================================================================
+PROGRAM NAME     : CM_B912S_PKG
+CREATED BY       : 김일영
+CREATED DATE     : 2020-07-16
+LAST UPDATED BY  : 김일영
+LAST UPDATE DATE :
+PURPOSE          :  홈페이지,모바일 혹은 voc로 통해 접수된 부가세정보등록 요청에 대한 통합
+VERSION          : 1.0
+COMMENT          : 홈페이지,모바일 혹은 voc로 통해 접수된 부가세정보등록 요청에 대한 통합
+================================================================================
+CHANGE HISTORY
+--------------------------------------------------------------------------------
+DATE        NAME          DESCRIPTION
+----------- ------------  ------------------------------------------------------
+2012-01-17  김일영 최종작성
+================================================================================
+**/
+
+
+/*================================================================================
+PROGRAM NAME     : main_query
+CREATED BY       : 김일영
+CREATED DATE     : 2020-07-16
+LAST UPDATED BY  : 김일영
+LAST UPDATE DATE :
+PURPOSE          : 홈페이지,모바일 혹은 voc로 통해 접수된 부가세정보등록 요청에 대한 조회(리스트)
+VERSION          : 1.0
+COMMENT          : 홈페이지,모바일 혹은 voc로 통해 접수된 부가세정보등록 요청에 대한 조회(리스트)
+================================================================================*/
+PROCEDURE main_query(
+
+       O_CSR            OUT CSR_TYPE,
+       O_ERR            OUT VARCHAR2,
+       V_USERID         IN  VARCHAR2,   -- 필수 : 사용자 아이디
+       V_LANG           IN  VARCHAR2,   -- 필수 : 시스템 언어
+       V_IP             IN  VARCHAR2,   -- 필수 : 사용자 IP
+       p_center_cd      IN  CHAR,--센터코드
+       p_receipt_date_from   IN VARCHAR2, --접수일자시작
+       p_receipt_date_to     IN VARCHAR2,
+       p_statusFlg           IN CHAR      -- 처리여부
+       ) IS
+   
+begin
+  
+   --x_pre_from_date :=add_months(to_date(replace(p_yyyymm,'-',''),'YYYYMM'),-1);
+   --x_param := v_userid || ':' || v_lang || ':' || v_ip || ':' || p_cm_charg_yymm || ':' || p_bill_cycle ;  
+   --접수일자,접수구분,납부번호,납부자명,처리상태,첨부파일,비고,처리일시,처리자명
+   
+   --cm_iif_counsel에 있는 납부번호와 고객번호를 맞지 않음 -> cm_document_receipt에서 고객번호와 세대번호로 납부번호를 가져와야 맞음
+   open o_csr for
+   select 
+          to_char(ccr.cm_receipt_dttm,'yyyy-mm-dd') as CM_B100S_T1--접수일자
+          ,clv.descr   as CM_B100S_T2 --접수구분
+          ,acct.acct_id as CM_B100S_T3--납부번호
+          
+         /* ,ccr.prem_id
+          ,ccr.per_id
+          ,cic.prem_id
+          ,cic.per_id 
+          ,cic.acct_id
+          ,acct.acct_id*/
+          ,acct.entity_name as CM_B100S_T4
+          --,cic.cm_per_nm
+          --,cic.cm_per_nm as CM_B100S_T4--납부자명
+          ,clv1.descr  as CM_B100S_T5--처리상태
+          --,ccr.cm_document_path as CM_B100S_T6--파일명
+          --, utl_url.escape(''||CM_C470S_PKG.GET_URL('CM_CDOCUMENT_RECEIPT', ccr.CM_DOC_RECEIPT_ID, '1')||'') AS CM_B100S_T6--파일명
+          ,ccr.cm_document_path AS CM_B100S_T6--파일명
+          ,ccr.cm_description as CM_B100S_T7--비고
+          ,to_char(ccr.cm_complete_dttm,'yyyy-mm-dd hh24:mi:ss') as CM_B100S_T8 --처리일시
+          ,ccr.cm_complete_user_id as CM_B100S_T9 --처리자(사번)
+          ,ccr.cm_doc_receipt_id as CM_B100S_T10 --문서접수ID-pk(숨김필드)
+          ,'V' as CM_B100S_T11--접수채널코드(숨김필드)
+          ,ccr.cm_complete_yn   as CM_B100S_T12  --처리상태코드(숨김필드)
+          ,(select hname 
+              from cm_emp_info_vw 
+             where empcd = cast(trim(ccr.cm_complete_user_id ) as char(100)) ) AS CM_B100S_T13 -- 처리자명
+             
+          ,ba.cm_upload_grp_id AS CM_B100S_T14 -- 첨부파일 GRP_ID
+          ,ba.acct_id AS CM_B100S_T15 -- ACCT_ID
+          ,ba.cm_seq  AS CM_B100S_T16 -- 순번
+                          
+   from  cm_cdocument_receipt ccr
+        ,cm_iif_counsel       cic
+        ,ci_lookup_val_l      clv
+        ,ci_lookup_val_l      clv1
+        ,ci_acct_per          acct_per
+        ,ci_acct              acct
+        ,cm_btax_apln         ba
+       /* ,ci_acct              acct1*/
+
+        
+   where ccr.cm_counsel_id=cic.cm_counsel_id
+   and   ccr.per_id=acct_per.per_id
+   and   acct_per.main_cust_sw='Y'
+   and   acct_per.acct_rel_type_cd='MAIN'
+   and   acct_per.acct_id=acct.acct_id
+   and   acct.mailing_prem_id=ccr.prem_id
+   /*and   cic.acct_id=acct1.acct_id(+)*/
+   and   clv.field_name='CM_TAX_ACPT_CHNL_FLG'
+   and   clv.field_value='V'
+   and   clv.language_cd=V_LANG
+   and   ccr.cm_complete_yn=clv1.field_value
+   and   clv1.field_name='CM_HP_STATUS_FLG'
+   and   clv1.language_cd=V_LANG
+   and   ccr.cm_document_type='1501'
+   
+   AND   ccr.cm_doc_receipt_id=ba.source_table_id(+)
+   and   ba.source_table(+)='CM_CDOCUMENT_RECEIPT'
+   
+   AND   ccr.cm_complete_yn = NVL(p_statusFlg, ccr.cm_complete_yn)
+   and   cic.cm_center_cd=nvl(p_center_cd,cic.cm_center_cd)
+   and   ccr.cm_receipt_dttm >= to_date(replace(p_receipt_date_from,'-',''),'yyyymmdd')
+   and   ccr.cm_receipt_dttm < to_date(replace(p_receipt_date_to,'-',''),'yyyymmdd') + 1
+   union all
+   select 
+          to_char(hba.cm_receipt_dttm,'yyyy-mm-dd') as CM_B100S_T1--접수일자
+          ,clv.descr   as CM_B100S_T2 --접수구분
+          ,hba.acct_id as CM_B100S_T3--납부번호
+          ,acct.entity_name as CM_B100S_T4--납부자명
+          ,clv1.descr  as CM_B100S_T5--처리상태
+          ,hba.cm_file_path as CM_B100S_T6--파일명
+          ,hba.cm_description as CM_B100S_T7--비고
+          ,to_char(hba.cm_complete_dttm,'yyyy-mm-dd hh24:mi:ss') as CM_B100S_T8 --처리일시
+          ,hba.cm_complete_user_id as CM_B100S_T9 --처리자(사번)
+          ,hba.cm_hp_btax_apln_id as CM_B100S_T10 --문서접수ID-pk(숨김필드)
+          ,hba.cm_tax_acpt_chnl_flg as CM_B100S_T11--접수채널코드(숨김필드)
+          ,hba.cm_hp_status_flg   as CM_B100S_T12  --처리상태코드(숨김필드)
+          ,(select hname 
+              from cm_emp_info_vw 
+             where empcd = cast(trim(hba.cm_complete_user_id ) as char(100)) ) AS CM_B100S_T13 -- 처리자명
+             
+          ,ba.cm_upload_grp_id AS CM_B100S_T14 -- 첨부파일 GRP_ID
+          ,ba.acct_id AS CM_B100S_T15 -- ACCT_ID
+          ,ba.cm_seq  AS CM_B100S_T16 -- 순번
+   from  cm_hp_btax_apln   hba
+        ,ci_acct acct
+        ,ci_lookup_val_l  clv
+        ,ci_lookup_val_l  clv1
+        ,ci_prem_char     cpc
+        ,cm_btax_apln     ba
+   where hba.acct_id=acct.acct_id
+   and   hba.cm_tax_acpt_chnl_flg=clv.field_value
+   and   clv.field_name='CM_TAX_ACPT_CHNL_FLG'
+   and   clv.language_cd=V_LANG
+   and   hba.cm_hp_status_flg=clv1.field_value
+   and   clv1.field_name='CM_HP_STATUS_FLG'
+   and   clv1.language_cd=V_LANG
+   and   acct.mailing_prem_id=cpc.prem_id
+   and   cpc.char_type_cd='CM_CCNT'
+   
+   and   hba.cm_hp_btax_apln_id=ba.source_table_id(+)
+   and   ba.source_table(+)='CM_HP_BTAX_APLN'
+   
+   AND   hba.cm_hp_status_flg = NVL(p_statusFlg, hba.cm_hp_status_flg)
+   and   cpc.char_val=nvl(p_center_cd,cpc.char_val)
+   and   hba.cm_receipt_dttm >= to_date(replace(p_receipt_date_from,'-',''),'yyyymmdd')
+   and   hba.cm_receipt_dttm < to_date(replace(p_receipt_date_to,'-',''),'yyyymmdd') + 1;
+   
+     
+    
+end;    
+
+
+/*================================================================================
+PROGRAM NAME     : sub_query
+CREATED BY       : 김일영
+CREATED DATE     : 2020-07-16
+LAST UPDATED BY  : 김일영
+LAST UPDATE DATE :
+PURPOSE          : 홈페이지,모바일 혹은 voc로 통해 접수된 부가세정보등록 요청에 대한 조회(리스트클릭시)
+VERSION          : 1.0
+COMMENT          : 홈페이지,모바일 혹은 voc로 통해 접수된 부가세정보등록 요청에 대한 조회(리스트클릭시)
+================================================================================*/
+PROCEDURE sub_query(
+
+       O_CSR            OUT CSR_TYPE,
+       O_ERR            OUT VARCHAR2,
+       V_USERID         IN  VARCHAR2,   -- 필수 : 사용자 아이디
+       V_LANG           IN  VARCHAR2,   -- 필수 : 시스템 언어
+       V_IP             IN  VARCHAR2,   -- 필수 : 사용자 IP
+       p_doc_receipt_id      IN  CHAR,--문서접수ID
+       p_tax_acpt_chnl_flg   IN VARCHAR2, --접수채널
+       p_acct_id             IN CHAR--변경납부자ID  
+       ) IS
+   
+begin
+  
+   --x_pre_from_date :=add_months(to_date(replace(p_yyyymm,'-',''),'YYYYMM'),-1);
+   --x_param := v_userid || ':' || v_lang || ':' || v_ip || ':' || p_cm_charg_yymm || ':' || p_bill_cycle ;  
+   --접수일자,접수구분,납부번호,납부자명,처리상태,첨부파일,비고,처리일시,처리자명
+   open o_csr for
+   select 
+           to_char(ccr.cm_receipt_dttm,'yyyy-mm-dd') as CM_B100S_T1--접수일자
+         , 'V'   as CM_B100S_T2 --접수구분
+         , ccr.cm_complete_yn  as CM_B100S_T3--처리상태
+         , ccr.cm_description as CM_B100S_T4--비고
+         , ccr.cm_document_path as CM_B100S_T5--파일명
+         , acct.acct_id as CM_B100S_T6--납부번호
+         , acct.entity_name as CM_B100S_T7--납부자명
+         , TRIM(PREM.GEO_CODE)||' '|| TRIM(PREM.ADDRESS1)                       
+                         ||' '|| TRIM(PREM.ADDRESS4)||' '|| TRIM(PREM.NUM1)                   
+                         || DECODE( TRIM(PREM.NUM2), '', '', '-'|| TRIM(PREM.NUM2))     
+                         ||' '|| CPC.ADHOC_CHAR_VAL               as CM_B100S_T8 --*납부자주소
+         , ba.cm_request_gubun as CM_B100S_T9 --신청구분
+         , ba.cm_biz_reg_no    as CM_B100S_T10 --사업자번호
+         , ba.cm_trade_nm      as CM_B100S_T11--상호
+         , ba.cm_ind_type      as CM_B100S_T12--업종
+         , ba.cm_biz_conditions as CM_B100S_T13--업태코드
+         , ba.cm_rptv           as CM_B100S_T14--대표자
+         , ( select hname from cm_emp_info_vw where empcd = cast(trim(ba.CM_ACCEPT_ID ) as char(100) ) ) CM_B100S_T15  -- 접수자  
+         , ( select dept_name from cm_emp_info_vw where empcd = cast(trim( ba.CM_ACCEPT_ID  ) as char(100) ) ) CM_B100S_T16  -- 접수자소속     
+         , to_char(ba.cm_accept_date, 'YYYY-MM-DD')             CM_B100S_T17 -- 접수일     
+         , ba.cm_chg_acct_id                                    CM_B100S_T18 -- 변경납부자
+         , acct2.entity_name                                 CM_B100S_T19 -- 변경납부자명
+         , ba.buyr_code        CM_B100S_T20 -- 종사업자번호
+         , regexp_replace(ba.cm_end_yyyymm, '([0-9]{4})([0-9]{2})', '\1-\2')  CM_B100S_T21 -- 적용청구년월       
+         , ba.cm_status                                         CM_B100S_T22 -- 상태                
+         , ba.cm_description                                    CM_B100S_T23 -- 비고(요청사항)    
+         , ba.cm_seq                                            CM_B100S_T24 -- 일련번호
+         -- 2016-02-12 / 2016-0296 / 김태훈 대리 / 양원호
+        -- , ( SELECT  DECODE(COUNT(CM_UPLOAD_ID), 0, 'N', 'Y') FROM CM_BFILE_UPLOAD WHERE CM_UPLOAD_GRP_ID = BTAXAPLN.CM_UPLOAD_GRP_ID ) CM_B100S_F22
+         , ( SELECT  DECODE(COUNT(CM_UPLOAD_ID), 0, 'N', 'Y') FROM CM_BFILE_UPLOAD 
+                     WHERE CM_UPLOAD_GRP_ID = ba.CM_UPLOAD_GRP_ID
+                       AND CM_SOURCE_TABLE = 'cm_btax_apln'
+                       AND CM_SOURCE_TABLE_KEY = ba.ACCT_ID||'-'|| ba.CM_SEQ ) CM_B100S_T25 --파일여부
+         , ba.cm_acpt_chnl_flg                                  CM_B100S_T26 -- 접수채널코드
+         , ba.cm_upload_grp_id             CM_B100S_T27 -- 파일첨부그룹ID
+         --, CM_BIZ_CONDITIONS                                 CM_B100S_F25 -- 업태명
+         , (SELECT TRIM(DESCR) FROM CI_LOOKUP T WHERE T.FIELD_NAME = 'CM_BIZ_TYPE' AND T.LANGUAGE_CD = V_LANG AND FIELD_VALUE = ba.cm_biz_conditions) CM_B100S_T28 --업태명
+          --      
+         , ba.buyer_name            CM_B100S_T29     -- VARCHAR2(30)   공급받는자담당자명  
+         , ba.buyer_fax             CM_B100S_T30     -- VARCHAR2(20)   공급받는자FAX번호        
+         , replace(ba.buyer_email, '@'||substr( ba.buyer_email, instr( ba.buyer_email, '@')+1), '')           CM_B100S_T31     -- VARCHAR2(40)   공급받는자담당자이메일     
+         , ba.buyer_mobile          CM_B100S_T32     -- VARCHAR2(20)   공급받는자담당자휴대폰번호              
+         , ba.buyer_tel             CM_B100S_T33     -- VARCHAR2(20)   공급받는자담당자전화번호               
+         , ba.cm_return_reason             CM_B100S_T34     -- VARCHAR2(20)   반려사유    
+         --
+         , ba.cm_biz_gubun CM_B100S_T35 --사업자구분
+         , ba.cm_corporate_no CM_B100S_T36 --법인--주민번호
+         , ba.cm_corporate_nm CM_B100S_T37 --법인명
+         , to_char(ba.cm_biz_begin_dt, 'yyyy-mm-dd') CM_B100S_T38 --사업개시일
+         , ba.cm_biz_address CM_B100S_T39 --사업소재지
+         , ba.cm_hq_address CM_B100S_T40 --본점소재지
+         , ccr.cm_doc_receipt_id as CM_B100S_T41 --원천 ID
+         , clv.descr as CM_B100S_T42--업태명
+         , ba.cm_accept_id       AS CM_B100S_T43 -- 접수자                
+         , ba.cm_accept_dept     AS CM_B100S_T44 -- 접수자소속 
+         , regexp_replace(ba.buyer_email, '.*@(.*)', '\1') AS CM_B100S_T45 -- 이메일 뒷부분
+         
+   from  cm_cdocument_receipt ccr
+        --,cm_iif_counsel       cic
+        ,cm_btax_apln         ba
+        ,ci_acct              acct
+        ,ci_acct_per          acct_per
+        ,ci_prem              prem
+        ,ci_prem_char         cpc
+        ,ci_lookup_val_l      clv
+        ,( 
+          SELECT ACCT_PER.ACCT_ID  
+               , PNAME.ENTITY_NAME 
+            FROM CI_ACCT_PER ACCT_PER
+               , CI_PER_ID PER_ID
+               , CI_PER_NAME PNAME
+           WHERE ACCT_PER.PER_ID = PNAME.PER_ID
+             AND ACCT_PER.PER_ID = PER_ID.PER_ID
+             and per_id.prim_sw = 'Y' and pname.name_type_flg = 'PRIM'
+             AND ACCT_ID = p_acct_id
+           ) ACCT2
+   where /*ccr.cm_counsel_id=cic.cm_counsel_id
+   and*/   ccr.cm_doc_receipt_id=ba.source_table_id(+)
+   and   ba.source_table(+)='CM_CDOCUMENT_RECEIPT'
+   and   ccr.cm_doc_receipt_id=p_doc_receipt_id
+   and   p_tax_acpt_chnl_flg='V'
+   and   ccr.per_id=acct_per.per_id
+   and   acct_per.acct_rel_type_cd='MAIN'
+   and   acct_per.main_cust_sw='Y'
+   and   acct_per.acct_id=acct.acct_id
+   and   acct.mailing_prem_id=prem.prem_id
+   and   ccr.cm_document_type='1501'
+   and   prem.prem_id=cpc.prem_id
+   and   cpc.char_type_cd='CM_HO_NM'
+   and   ba.cm_chg_acct_id=acct2.acct_id(+)
+   and   ba.cm_biz_conditions = TRIM(clv.field_value (+))
+   and   clv.field_name (+) = 'CM_BIZ_TYPE'
+   and   clv.language_cd (+) =  V_LANG
+   
+   union all
+   
+      select 
+           to_char(hpa.cm_receipt_dttm,'yyyy-mm-dd') as CM_B100S_T1--접수일자
+         , hpa.cm_tax_acpt_chnl_flg   as CM_B100S_T2 --접수구분
+         , hpa.cm_hp_status_flg as CM_B100S_T3--처리상태
+         , hpa.cm_description as CM_B100S_T4--비고
+         , hpa.cm_file_path as CM_B100S_T5--파일명
+         , hpa.acct_id as CM_B100S_T6--납부번호
+         , acct.entity_name as CM_B100S_T7--납부자명
+         , TRIM(PREM.GEO_CODE)||' '|| TRIM(PREM.ADDRESS1)                       
+                         ||' '|| TRIM(PREM.ADDRESS4)||' '|| TRIM(PREM.NUM1)                   
+                         || DECODE( TRIM(PREM.NUM2), '', '', '-'|| TRIM(PREM.NUM2))     
+                         ||' '|| CPC.ADHOC_CHAR_VAL               as CM_B100S_T8 --*납부자주소
+         , ba.cm_request_gubun as CM_B100S_T9 --신청구분
+         , ba.cm_biz_reg_no    as CM_B100S_T10 --사업자번호
+         , ba.cm_trade_nm      as CM_B100S_T11--상호
+         , ba.cm_ind_type      as CM_B100S_T12--업종
+         , ba.cm_biz_conditions as CM_B100S_T13--업태코드
+         , ba.cm_rptv           as CM_B100S_T14--대표자
+         , ( select hname from cm_emp_info_vw where empcd = cast(trim(ba.CM_ACCEPT_ID ) as char(100) ) ) CM_B100S_T15  -- 접수자  
+         , ( select dept_name from cm_emp_info_vw where empcd = cast(trim( ba.CM_ACCEPT_ID  ) as char(100) ) ) CM_B100S_T16  -- 접수자소속     
+         , to_char(ba.cm_accept_date, 'YYYY-MM-DD')             CM_B100S_T17 -- 접수일     
+         , ba.cm_chg_acct_id                                    CM_B100S_T18 -- 변경납부자
+         , acct2.entity_name                                 CM_B100S_T19 -- 변경납부자명
+         , ba.buyr_code        CM_B100S_T20 -- 종사업자번호
+         , regexp_replace(ba.cm_end_yyyymm, '([0-9]{4})([0-9]{2})', '\1-\2')  CM_B100S_T21 -- 적용청구년월       
+         , ba.cm_status                                         CM_B100S_T22 -- 상태                
+         , ba.cm_description                                    CM_B100S_T23 -- 비고(요청사항)    
+         , ba.cm_seq                                            CM_B100S_T24 -- 일련번호
+         -- 2016-02-12 / 2016-0296 / 김태훈 대리 / 양원호
+        -- , ( SELECT  DECODE(COUNT(CM_UPLOAD_ID), 0, 'N', 'Y') FROM CM_BFILE_UPLOAD WHERE CM_UPLOAD_GRP_ID = BTAXAPLN.CM_UPLOAD_GRP_ID ) CM_B100S_F22
+         , ( SELECT  DECODE(COUNT(CM_UPLOAD_ID), 0, 'N', 'Y') FROM CM_BFILE_UPLOAD 
+                     WHERE CM_UPLOAD_GRP_ID = ba.CM_UPLOAD_GRP_ID
+                       AND CM_SOURCE_TABLE = 'cm_btax_apln'
+                       AND CM_SOURCE_TABLE_KEY = ba.ACCT_ID||'-'|| ba.CM_SEQ ) CM_B100S_T25 --파일여부
+         , ba.cm_acpt_chnl_flg                                  CM_B100S_T26 -- 접수채널코드
+         , ba.cm_upload_grp_id             CM_B100S_T27 -- 파일첨부그룹ID
+         --, CM_BIZ_CONDITIONS                                 CM_B100S_F25 -- 업태명
+         , (SELECT TRIM(DESCR) FROM CI_LOOKUP T WHERE T.FIELD_NAME = 'CM_BIZ_TYPE' AND T.LANGUAGE_CD = V_LANG AND FIELD_VALUE = ba.cm_biz_conditions) CM_B100S_T28 --업태명
+          --      
+         , ba.buyer_name            CM_B100S_T29     -- VARCHAR2(30)   공급받는자담당자명  
+         , ba.buyer_fax             CM_B100S_T30     -- VARCHAR2(20)   공급받는자FAX번호        
+         , replace(ba.buyer_email, '@'||substr( ba.buyer_email, instr( ba.buyer_email, '@')+1), '')           CM_B100S_T31     -- VARCHAR2(40)   공급받는자담당자이메일     
+         , ba.buyer_mobile          CM_B100S_T32     -- VARCHAR2(20)   공급받는자담당자휴대폰번호              
+         , ba.buyer_tel             CM_B100S_T33     -- VARCHAR2(20)   공급받는자담당자전화번호               
+         , ba.cm_return_reason             CM_B100S_T34     -- VARCHAR2(20)   반려사유    
+         --
+         , ba.cm_biz_gubun CM_B100S_T35 --사업자구분
+         , ba.cm_corporate_no CM_B100S_T36 --법인--주민번호
+         , ba.cm_corporate_nm CM_B100S_T37 --법인명
+         , to_char(ba.cm_biz_begin_dt, 'yyyy-mm-dd') CM_B100S_T38 --사업개시일
+         , ba.cm_biz_address CM_B100S_T39 --사업소재지
+         , ba.cm_hq_address CM_B100S_T40 --본점소재지
+         , hpa.cm_hp_btax_apln_id as CM_B100S_T41 --원천 ID
+         , clv.descr as CM_B100S_T42--업태명
+         , ba.cm_accept_id       AS CM_B100S_T43 -- 접수자                
+         , ba.cm_accept_dept     AS CM_B100S_T44 -- 접수자소속 
+         , regexp_replace(ba.buyer_email, '.*@(.*)', '\1') AS CM_B100S_T45 -- 이메일 뒷부분
+   from  cm_hp_btax_apln      hpa
+        ,cm_btax_apln         ba
+        ,ci_acct              acct
+        ,ci_prem              prem
+        ,ci_prem_char         cpc
+        ,ci_lookup_val_l      clv
+        ,( 
+          SELECT ACCT_PER.ACCT_ID  
+               , PNAME.ENTITY_NAME 
+            FROM CI_ACCT_PER ACCT_PER
+               , CI_PER_ID PER_ID
+               , CI_PER_NAME PNAME
+           WHERE ACCT_PER.PER_ID = PNAME.PER_ID
+             AND ACCT_PER.PER_ID = PER_ID.PER_ID
+             and per_id.prim_sw = 'Y' and pname.name_type_flg = 'PRIM'
+             AND ACCT_ID = p_acct_id
+           ) ACCT2
+   where 1=1
+   and   hpa.cm_hp_btax_apln_id=ba.source_table_id(+)
+   and   ba.source_table(+)='CM_HP_BTAX_APLN'
+   and   hpa.cm_hp_btax_apln_id=p_doc_receipt_id
+   and   p_tax_acpt_chnl_flg in('M','H')
+   and   hpa.acct_id=acct.acct_id
+   and   acct.mailing_prem_id=prem.prem_id
+   and   prem.prem_id=cpc.prem_id
+   and   cpc.char_type_cd='CM_HO_NM'
+   and   ba.cm_chg_acct_id=acct2.acct_id(+)
+   and   ba.cm_biz_conditions = TRIM(clv.field_value (+))
+   and   clv.field_name (+) = 'CM_BIZ_TYPE'
+   and   clv.language_cd (+) =  V_LANG
+   ;
+   
+
+       
+   
+
+    
+    
+end;    
+
+
+
+
+/*================================================================================
+PROGRAM NAME     : approval_request_u
+CREATED BY       : 김일영
+CREATED DATE     : 2014-08-21
+LAST UPDATED BY  : 김일영
+LAST UPDATE DATE :
+PURPOSE          : 접수된 건에 대해 부사게 신청정보를 Insert하고 신청정보를 완료한다.
+VERSION          : 1.0
+COMMENT          : 접수된 건에 대해 부사게 신청정보를 Insert하고 신청정보를 완료한다.
+
+
+
+
+=======================================================================================*/
+procedure approval_request
+           (
+             O_CSR         OUT CSR_TYPE,
+             O_ERR OUT VARCHAR2,
+             V_USERID      IN  VARCHAR2,   -- 필수 : 사용자 아이디
+             V_LANG        IN  VARCHAR2,   -- 필수 : 시스템 언어
+             V_IP          IN  VARCHAR2,   -- 필수 : 사용자 IP
+             p_doc_receipt_id      IN  VARCHAR2,--문서접수ID
+             p_tax_acpt_chnl_flg   IN VARCHAR2, --접수채널
+             p_acctid      in  varchar2,  -- 납부자
+             p_sinchung    in  varchar2,  -- 신청구분
+             p_bizcode     in  varchar2,  -- 사업자번호
+             p_sangho      in  varchar2,  -- 상호
+             p_saupgubun   in  varchar2,  -- 사업자 구분
+             p_upjong      in  varchar2,  -- 업종
+             p_uptae       in  varchar2,  -- 업태
+             p_boss        in  varchar2,  -- 대표자
+             p_bubinno     in  varchar2,  -- 법인 주민번호
+             p_jubsu       in  varchar2,  -- 접수자
+             p_jubsudept   in  varchar2,  -- 접수자소속
+             p_jubsudt     in  varchar2,  -- 접수일
+             p_bubinnm     in  varchar2,  -- 법인명
+             p_changeacct  in  varchar2,  -- 변경납부자
+             p_changeper   in  varchar2,  -- 변경납부자 perid
+             p_saupsdt     in  varchar2,  -- 사업게시일
+             p_toacceptym  in  varchar2,  -- 적용년월to
+             p_chnl_flg    in  varchar2, --채널구분
+             p_saupsoje    in  varchar2, --사업소재지
+             p_bonjumsoje  in  varchar2, --본점소재지
+             p_bigo        in  varchar2,  -- 비고
+             p_cmseq       in  varchar2,  -- cm_seq(안씀)
+             p_filegrp_id  in  varchar2,
+             p_jongsaup    in  varchar2,   -- 종사업장
+             p_buyer_name         in  varchar2,    -- varchar2(30)   공급받는자담당자명  
+             p_buyer_fax          in  varchar2,    -- varchar2(20)   공급받는자fax번호        
+             p_buyer_email        in  varchar2,    -- varchar2(40)   공급받는자담당자이메일 
+             p_buyer_maildomain   in  varchar2,    -- varchar2(40)   공급받는자담당자이메일        
+             p_buyer_mobile       in  varchar2,    -- varchar2(20)   공급받는자담당자휴대폰번호              
+             p_buyer_tel          in  varchar2,    -- varchar2(20)   공급받는자담당자전화번호 
+             p_file_name          in  VARCHAR2,    -- 파일명 
+             p_file_size          in  VARCHAR2     -- 파일사이즈
+             ) is
+   
+   x_exist_yn varchar2(1);
+   x_bill_cnt       number;
+   x_tax_invoice_yn varchar2(1);
+   x_tax_yyyymm     varchar2(6);
+   x_enp_plc_cd     cm_btax_invoice.cm_enp_plc_cd%type;
+   x_close_yn       varchar2(1);
+   x_exist_yn1 varchar2(1);
+   x_jubdt     varchar2(10);
+   x_grpid     varchar2(100);
+   x_cm_seq    NUMBER; -- 일련번호
+begin
+
+   -- 부가세 마스터 
+    begin
+       select t.cm_tax_invoice_yn  
+        into x_exist_yn
+        from cm_btax_master_vw t
+       where t.acct_id = cast( p_acctid as char(100) );
+       
+    exception   when others then
+       x_exist_yn := null;
+    end;       
+   
+    -- 빌 정보 
+    select count(*) 
+      into x_bill_cnt 
+      from cm_bbill_transaction
+     where acct_id =  p_acctid
+       and cm_charg_yymm = p_toacceptym ;
+ 
+   -- 부가세 생성내역
+   begin    
+      select nvl(cm_tax_invoice_yn,'N'), cm_stax_yymm ,cm_enp_plc_cd 
+      into x_tax_invoice_yn , x_tax_yyyymm , x_enp_plc_cd
+      from cm_btax_invoice
+      where acct_id =  p_acctid
+       and cm_charg_yymm = replace(p_toacceptym, '-', '')
+       and cm_invoice_seq = (select max(cbi.cm_invoice_seq) from cm_btax_invoice cbi
+                              where cbi.cm_charg_yymm = replace(p_toacceptym, '-', '')
+                                and cbi.acct_id =  p_acctid );
+   exception
+     when no_data_found then
+       /*o_err := 'err생성된 부가세 내역이 없습니다.'; */
+       x_tax_invoice_yn := null;
+       x_tax_yyyymm := null;
+       x_enp_plc_cd := null;
+     when others then
+       null; 
+   end;    
+ 
+ -- Invoice 정보에서 청구년월을 확인하여
+ -- 부가세 마감이 되어 있으면 제어하도록 한다
+  
+   begin 
+      select nvl(bc.cm_close_yn,'N')
+       into x_close_yn 
+       from cm_btax_close bc
+      where bc.cm_tax_yyyymm = x_tax_yyyymm 
+        and bc.cm_enp_plc_cd = x_enp_plc_cd;
+   exception
+    when others then
+      x_close_yn := 'N';
+   end; 
+ 
+
+--o_err := 'err'||V_SINCHUNG||'.'||'Tax Master : '||tax_YN||'Invoice : '||tax_invoice_yn||'.'||'Bill건수 : '||m_cnt2;
+--o_err := 'err___'||m_cnt||'---'||m_cnt2||'==='||V_SINCHUNG;
+
+  if x_close_yn = 'Y' then
+     o_err := 'err입력하신 적용청구년월의 부가세 생성이 마감 되었습니다..'||chr(10)||chr(13)||'적용청구년월을 다시 확인해 주시기 바랍니다.';
+     return;
+  end if;  
+
+  
+  -- 신규  
+  if p_sinchung = '99' then 
+     if x_bill_cnt > 0 and  x_exist_yn is not null then
+        o_err := 'err해당 납부번호의 Bill과 부가세 마스터 정보가 존재합니다.'||chr(10)||chr(13)||'신규 신청은 부가세 마스터 정보가 없어야 합니다.'; 
+        return;
+       --raise_application_error(-20001,o_err);
+     elsif x_exist_yn is not null then  
+        o_err := 'err해당 납부번호의 부가세 마스터 정보가 존재합니다.'||chr(10)||chr(13)||'신규 신청은 부가세 마스터 정보가 없어야 합니다.';
+        return;
+       --raise_application_error(-20001,o_err);
+     end if;  
+
+  else -- 신규 이외
+ 
+    -- 정보변경    
+     if p_sinchung = '20' then
+        if x_exist_yn is null then  
+           o_err := 'err해당 납부번호의 부가세 마스터 정보가 존재하지 않습니다.'||chr(10)||chr(13)||'관리자에게 문의 바랍니다.';
+           return;
+        elsif x_bill_cnt= 0 then
+           o_err := 'err해당 납부번호의 Bill이 존재하지 않습니다.'||chr(10)||chr(13)||'Bill 정보가 없으면 신청정보를 등록 할 수 없습니다.'; 
+           return;
+       --raise_application_error(-20001,o_err); 
+        elsif x_tax_invoice_yn is null then  
+           o_err := 'err해당 납부번호의 Invoice 정보가 존재하지 않습니다.'||chr(10)||chr(13)||'관리자에게 문의 바랍니다.';
+           return;             
+        end if;      
+    -- 신청(N->Y) 세금계산서 대상  신청
+     elsif trim(p_sinchung) = '30' then 
+        if x_exist_yn = 'Y' and x_tax_invoice_yn = 'Y'  then 
+           o_err := 'err입력하신 '|| p_toacceptym||' 적용 청구년월에 부가세 대상으로 등록된 Invoice가 존재 합니다.'||chr(10)||chr(13)||'이전에 신청된 신청 정보가 있는지 확인 바랍니다.';
+           return;
+         --raise_application_error(-20001,o_err);
+        elsif x_exist_yn = 'N' and x_tax_invoice_yn = 'Y'  then   
+           o_err := 'err입력하신 '|| p_toacceptym||' 적용 청구년월에 부가세 대상으로 등록된 Invoice가 존재합니다.'||chr(10)||chr(13)||
+                                                '또한 현재 부가세 마스터 정보가 부가세 비대상으로 되어있으니, 관리자에게 확인 바랍니다.';  
+           return;
+         --raise_application_error(-20001,o_err);
+        elsif x_bill_cnt = 0 then
+           o_err := 'err해당 납부번호의 Bill이 존재하지 않습니다.'||chr(10)||chr(13)||'Bill 정보가 없으면 신청정보를 등록 할 수 없습니다.'; 
+           return;
+       --raise_application_error(-20001,o_err); 
+        elsif x_tax_invoice_yn is null then  
+           o_err := 'err해당 납부번호의 부가세 생성 정보가 존재하지 않습니다.'||chr(10)||chr(13)||'부가세 생성 정보를 확인해 주세요.';
+           return;             
+        end if;
+     
+    -- 해지(Y->N)세금계산서 대상 해지
+    elsif trim(p_sinchung) = '40' then 
+       if x_exist_yn = 'N' and x_tax_invoice_yn = 'N' then        
+          o_err := 'err입력하신 '|| p_toacceptym ||' 적용 청구년월에 부가세 비대상으로 등록된 Invoice가 존재 합니다.'||chr(10)||chr(13)||'이전에 해지된 신청 정보가 있는지 확인 바랍니다.';
+          return;
+        --raise_application_error(-20001,o_err);
+       elsif x_exist_yn = 'Y' and x_tax_invoice_yn = 'N' then        
+        o_err := 'err입력하신 '|| p_toacceptym||' 적용 청구년월에 부가세 비대상으로 등록된 Invoice가 존재합니다.'||chr(10)||chr(13)||
+                                               '또한 현재 부가세 마스터 정보가 부가세 대상으로 되어있으니, 관리자에게 확인 바랍니다.';       
+        return;
+        --raise_application_error(-20001,o_err);
+       elsif x_bill_cnt = 0 then
+        o_err := 'err해당 납부번호의 Bill이 존재하지 않습니다.'||chr(10)||chr(13)||'Bill 정보가 없으면 해지정보를 등록 할 수 없습니다.'; 
+        return;
+       elsif x_tax_invoice_yn is null then  
+        o_err := 'err해당 납부번호의 부가세 생성 정보가 존재하지 않습니다.'||chr(10)||chr(13)||'부가세 생성 정보를 확인해 주세요.';
+        return;           
+       end if;
+
+    -- 납부자변경
+    elsif p_sinchung = '50' then
+       -- 변경 납부자 마스터 확인
+       begin
+         select t.cm_tax_invoice_yn  
+           into x_exist_yn1
+           from cm_btax_master_vw t
+          where t.acct_id = p_changeacct ;
+       exception
+         when no_data_found then
+           x_exist_yn1:= null; 
+         when others then
+           o_err := 'err변경납부자 등록시 : 부가세 마스터 정보를 확인해 주세요.';
+           return;
+       end; 
+                   
+       if p_changeacct is null then        
+         o_err := 'err변경납부자를 입력하세요.';
+         return;
+         --raise_application_error(-20001,o_err);
+       elsif x_exist_yn1 is null then        
+         o_err := 'err해당 변경납부번호의 부가세 마스터 정보가 존재하지 않습니다.'||chr(10)||chr(13)||'부가세 마스터 정보를 확인해 주세요.';      
+         return;
+         --raise_application_error(-20001,o_err); 
+       end if;  
+     
+     end if;     
+  
+  end if;
+   
+  
+  IF p_file_name is not null THEN
+   SELECT TO_CHAR(SYSDATE, 'YYYYMMDDHH24mmss') 
+     INTO x_grpid 
+     FROM DUAL;      
+  END IF;
+  
+   select nvl(max(cm_seq), 0) + 1 
+     INTO x_cm_seq
+     from cm_btax_apln 
+    where acct_id = p_acctid
+   ;
+
+  
+   -- 부가세 신청정보 등록
+   INSERT INTO CM_BTAX_APLN
+   ( acct_id          -- 납부자번호
+   , cm_seq           -- 시퀀스(해당 납부자번호 max값)
+   , cm_request_gubun -- 신청구분코드
+   , cm_request_id    -- 요청자사번(=접수자사번)
+   , cm_request_date  -- 요청일(=접수일 )
+   , cm_accept_id     -- 접수자사번 ? 로그인 사용자의 사번
+   , cm_accept_date   -- 접수일  ? 현재일
+   , cm_accept_dept   -- 접수자의 부서코드 ? 로그인 사용자의 부서
+   , cm_status        -- 진행상태
+   , cm_description   -- 비고
+   , cm_call_reg_id   -- null
+   , buyr_code
+   , cm_end_yyyymm    -- 적용종료일 (=적용시작년월)
+   , cm_chg_acct_id   -- 신청구분코드가 50 인 경우
+   , cm_chg_per_id    -- 신청구분코드가 50 인 경우 변경납부자의 per_id
+   , cm_created_id
+   , cm_created_dttm
+   , cm_updated_id
+   , cm_updated_dttm
+   , version
+   , cm_biz_reg_no  
+   , cm_trade_nm  
+   , cm_ind_type  
+   , cm_biz_conditions    
+   , cm_rptv        
+   , cm_acpt_chnl_flg           -- 채널구분 : ci_lookup.cm_acpt_chnl_flg
+   , cm_upload_grp_id           -- 업로드그룹id    
+   , buyer_name         -- varchar2(30)   공급받는자담당자명  
+   , buyer_fax           -- varchar2(20)   공급받는자fax번호        
+   , buyer_email         -- varchar2(40)   공급받는자담당자이메일     
+   , buyer_mobile         -- varchar2(20)   공급받는자담당자휴대폰번호              
+   , buyer_tel           -- varchar2(20)   공급받는자담당자전화번호         
+   , cm_biz_gubun               -- varchar2(2)    사업자구분(10:개인/20:법인)  
+   , cm_corporate_no            -- varchar2(20)   주민/법인등록번호           
+   , cm_biz_address             -- varchar2(150)  사업장소재지(부가세주소)       
+   , cm_hq_address              -- varchar2(150)  본점소재지               
+   , cm_corporate_nm            -- varchar2(100)  법인명                 
+   , cm_biz_begin_dt            -- date(7)   
+   , source_table
+   , source_table_id                         
+   )
+  select 
+   p_acctid  -- 납부자번호
+   , x_cm_seq   -- 시퀀스(해당 납부자번호 max값)
+   , p_sinchung -- 신청구분코드
+   , v_userid --v_jubsu    -- 요청자사번(=접수자사번)
+   -- 2016-1008 / 김태훈 대리 / 20160421 / 양원호
+--   , to_date(v_jubsudt, 'yyyy-mm-dd')  -- 요청일(=접수일 )
+   , trunc(SYSDATE)  -- 요청일(=접수일 )
+   , v_userid -- v_jubsu     -- 접수자사번 ? 로그인 사용자의 사번
+      -- 2016-1008 / 김태훈 대리 / 20160421 / 양원호
+--   , to_date(v_jubsudt, 'yyyy-mm-dd')   -- 접수일  ? 현재일
+   , trunc(SYSDATE)  -- 접수일  ? 현재일
+   , p_jubsudept   -- 접수자의 부서코드 ? 로그인 사용자의 부서
+   , '20'        -- 진행상태
+   , p_bigo   -- 비고
+   , null   -- null
+   , replace(p_jongsaup, '-', '')  -- 적용시작년월 (현재년월)
+   , replace(p_toacceptym, '-', '')    -- 적용종료일 (=적용시작년월)
+   , p_changeacct   -- 신청구분코드가 50 인 경우
+   , p_changeper    -- 신청구분코드가 50 인 경우 변경납부자의 per_id
+   , v_userid
+   , sysdate
+   , v_userid
+   , sysdate
+   , 1
+   , p_bizcode  
+   , p_sangho  
+   , p_upjong  
+   , p_uptae    
+   , p_boss
+   , p_chnl_flg
+   , x_grpid   
+   , p_buyer_name         -- varchar2(30)   공급받는자담당자명  
+   , p_buyer_fax           -- varchar2(20)   공급받는자fax번호        
+   , p_buyer_email||'@'||p_buyer_maildomain         -- varchar2(40)   공급받는자담당자이메일     
+   , p_buyer_mobile         -- varchar2(20)   공급받는자담당자휴대폰번호              
+   , p_buyer_tel           -- varchar2(20)   공급받는자담당자전화번호     
+   , p_saupgubun               -- varchar2(2)    사업자구분(10:개인/20:법인)  
+   , p_bubinno            -- varchar2(20)   주민/법인등록번호           
+   , p_saupsoje             -- varchar2(150)  사업장소재지(부가세주소)       
+   , p_bonjumsoje              -- varchar2(150)  본점소재지               
+   , p_bubinnm            -- varchar2(100)  법인명                 
+   , decode( p_saupsdt, '', null, to_date(p_saupsdt, 'yyyy-mm-dd'))            -- date(7)   
+   , decode(p_tax_acpt_chnl_flg,'V','CM_CDOCUMENT_RECEIPT','CM_HP_BTAX_APLN') --소스 테이블
+   , p_doc_receipt_id
+                           
+   from dual ;    
+   
+   if p_tax_acpt_chnl_flg ='V' then
+      update cm_cdocument_receipt a
+      set    a.cm_complete_yn='Y'
+            ,a.cm_complete_user_id=V_USERID
+            ,a.cm_complete_dttm=sysdate
+            ,a.cm_updated_dttm=sysdate
+      where a.cm_doc_receipt_id=p_doc_receipt_id;
+   else
+      update cm_hp_btax_apln a
+      set  a.cm_hp_status_flg='Y'
+          ,a.cm_complete_dttm=sysdate
+          ,a.cm_complete_user_id=V_USERID
+      where a.cm_hp_btax_apln_id=p_doc_receipt_id;
+   end if;
+   
+   
+  IF x_grpid is not null THEN
+      INSERT INTO CM_BFILE_UPLOAD 
+      (
+           CM_UPLOAD_ID               -- 업로드ID               
+         , CM_UPLOAD_GRP_ID           -- 업로드그룹ID             
+         , CM_SOURCE_TABLE            -- 소스테이블               
+         , CM_SOURCE_TABLE_KEY        -- 소스테이블key값           
+         , CM_URL                     -- 호출URL               
+         , CM_DELETE_YN               -- 삭제여부                
+         , CM_ATTRIBUTE1              --                     
+         , CM_ATTRIBUTE2              --                     
+         , CM_ATTRIBUTE3              --                     
+         , CM_ATTRIBUTE4              --                     
+         , CM_ATTRIBUTE5              --                     
+         , CM_CREATED_ID              --                     
+         , CM_CREATED_DTTM            --                     
+         , CM_UPDATED_ID              --                     
+         , CM_UPDATED_DTTM            --                     
+         , VERSION                    --  
+      )
+      VALUES
+      (
+           CM_BFILE_UPLOAD_S.NEXTVAL                            -- 업로드ID               
+         , x_grpid                                              -- 업로드그룹ID             
+         , 'cm_btax_apln'                                       -- 소스테이블               
+         , p_acctid || '-' || x_cm_seq                          -- 소스테이블key값           
+         , 'FUD/'||p_file_name                                  -- 호출URL               
+         , 'N'                                                  -- 삭제여부                
+         , regexp_replace(p_file_name, '^transferred_', '')     -- READF NM, 다운로드용 파일명은 transferred 제외
+         , p_file_name                                          -- SERVF NM                    
+         , p_file_size       --                     
+         , NULL              --                     
+         , NULL              --                     
+         , V_USERID          --                     
+         , SYSDATE           --                     
+         , V_USERID          --                     
+         , SYSDATE           --                     
+         , 1                 --  
+      )
+      ;
+  END IF;
+     
+exception 
+   when others then
+        o_err :='err ' || sqlcode || '-' || sqlerrm;
+        rollback;
+      
+end;     
+
+/*================================================================================
+PROGRAM NAME     : file_upload
+CREATED BY       : 김일영
+CREATED DATE     : 2014-08-21
+LAST UPDATED BY  : 김일영
+LAST UPDATE DATE :
+PURPOSE          : 파일 업로드시 테이블 삽입
+VERSION          : 1.0
+COMMENT          : 파일 업로드시 테이블 삽입
+
+
+
+
+=======================================================================================*/
+
+PROCEDURE file_upload(
+O_CSR         OUT CSR_TYPE,
+O_ERR         OUT VARCHAR,
+V_USERID      IN  CHAR,
+V_LANG        IN  CHAR,
+V_IP          IN  CHAR,
+V_GRPID       IN  CHAR,   -- grpid
+V_READFNM     IN  CHAR,   -- 사용자 파일명
+V_SERVFNM     IN  CHAR,   -- 서버보관명
+V_FSIZE       IN  CHAR,    -- 사이즈
+V_SRC_TB      IN  CHAR,
+V_SRC_COL     IN  CHAR
+)
+IS
+      
+BEGIN 
+
+  
+  INSERT INTO CM_BFILE_UPLOAD 
+  (
+       CM_UPLOAD_ID               -- 업로드ID               
+     , CM_UPLOAD_GRP_ID           -- 업로드그룹ID             
+     , CM_SOURCE_TABLE            -- 소스테이블               
+     , CM_SOURCE_TABLE_KEY        -- 소스테이블key값           
+     , CM_URL                     -- 호출URL               
+     , CM_DELETE_YN               -- 삭제여부                
+     , CM_ATTRIBUTE1              --                     
+     , CM_ATTRIBUTE2              --                     
+     , CM_ATTRIBUTE3              --                     
+     , CM_ATTRIBUTE4              --                     
+     , CM_ATTRIBUTE5              --                     
+     , CM_CREATED_ID              --                     
+     , CM_CREATED_DTTM            --                     
+     , CM_UPDATED_ID              --                     
+     , CM_UPDATED_DTTM            --                     
+     , VERSION                    --  
+  )
+  VALUES
+  (
+       CM_BFILE_UPLOAD_S.NEXTVAL                            -- 업로드ID               
+     , DECODE(V_GRPID, '', '9991234999', V_GRPID)           -- 업로드그룹ID             
+     , V_SRC_TB                                             -- 소스테이블               
+     , V_SRC_COL                                            -- 소스테이블key값           
+     , 'FUD/'||V_SERVFNM                                    -- 호출URL               
+     , 'N'                                                  -- 삭제여부                
+     , V_READFNM                                            -- READF NM                  
+     , V_SERVFNM                                            -- SERVF NM                    
+     , V_FSIZE              --                     
+     , NULL              --                     
+     , NULL              --                     
+     , V_USERID              --                     
+     , SYSDATE            --                     
+     , V_USERID              --                     
+     , SYSDATE            --                     
+     , 1                    --  
+  );
+  
+end  ;
+/*================================================================================
+PROGRAM NAME     : file_del
+CREATED BY       : 김일영
+CREATED DATE     : 2020-07-15
+LAST UPDATED BY  : 김일영
+LAST UPDATE DATE :
+PURPOSE          : 파일 업로드된 파일삭제
+VERSION          : 1.0
+COMMENT          : 파일 업로드된 파일삭제
+
+
+
+
+=======================================================================================*/
+PROCEDURE file_del(
+O_CSR         OUT CSR_TYPE,
+O_ERR         OUT VARCHAR,
+V_USERID      IN  CHAR,
+V_LANG        IN  CHAR,
+V_IP          IN  CHAR,
+V_FILEID      IN  CHAR   -- file id
+)
+IS
+      
+BEGIN 
+
+  
+   UPDATE CM_BFILE_UPLOAD SET
+         CM_DELETE_YN = 'Y'
+       , cm_updated_id = V_USERID
+       , cm_updated_dttm = sysdate
+   WHERE CM_UPLOAD_ID = V_FILEID
+       ;
+   
+END ;    
+
+
+/*================================================================================
+PROGRAM NAME     : complete_no_reg_u
+CREATED BY       : 김일영
+CREATED DATE     : 2020-07-15
+LAST UPDATED BY  : 김일영
+LAST UPDATE DATE :
+PURPOSE          : 미등록건으로 완료처일한다.
+VERSION          : 1.0
+COMMENT          : 미등록건으로 완료처일한다.
+
+
+
+
+=======================================================================================*/
+procedure complete_no_reg
+           (
+             O_CSR         OUT CSR_TYPE,
+             O_ERR OUT VARCHAR2,
+             V_USERID      IN  VARCHAR2,   -- 필수 : 사용자 아이디
+             V_LANG        IN  VARCHAR2,   -- 필수 : 시스템 언어
+             V_IP          IN  VARCHAR2,   -- 필수 : 사용자 IP
+             p_doc_receipt_id      IN  CHAR,--문서접수ID
+             p_tax_acpt_chnl_flg   IN VARCHAR2) --접수채널
+             is
+begin
+   if p_tax_acpt_chnl_flg ='V' then
+      update cm_cdocument_receipt a
+      set    a.cm_complete_yn='T' -- 미등록 완료
+            ,a.cm_complete_user_id=V_USERID
+            ,a.cm_complete_dttm=sysdate
+            ,a.cm_updated_dttm=sysdate
+      where a.cm_doc_receipt_id=p_doc_receipt_id;
+   else
+      update cm_hp_btax_apln a
+      set  a.cm_hp_status_flg='T' -- 미등록 완료
+          ,a.cm_complete_dttm=sysdate
+          ,a.cm_complete_user_id=V_USERID
+      where a.cm_hp_btax_apln_id=p_doc_receipt_id;
+   end if;
+
+end;    
+
+         
+END ;
