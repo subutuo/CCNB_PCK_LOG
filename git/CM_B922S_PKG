@@ -163,7 +163,6 @@ begin
    x_from_date :=to_date(p_yyyy || x_from_month,'yyyymm');
    x_to_date   :=to_date(p_yyyy || x_to_month,'yyyymm');
       
-   --월,울산 공급가액,울산부가세액,양산공급가액,양산부가세
    open o_csr for
        
    select 
@@ -324,7 +323,7 @@ PROCEDURE  download1
 begin
    
    
---   x_from_month := lpad((to_number(p_quarter)-1) + 1 ,2,'0');
+--   x_from_month := lpad((to_number(p_quarter)-1) + 1 ,2,'0')
 --   x_to_month   := lpad((to_number(p_quarter)*3),2,'0');
    x_from_month := lpad(1 + ((to_number(p_quarter) - 1) * 3), 2, '0');
    x_to_month   := lpad(TO_NUMBER(p_quarter) * 3, 2, '0');
