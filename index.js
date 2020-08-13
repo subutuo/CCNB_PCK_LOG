@@ -90,7 +90,7 @@ async function detectChanges(server) {
       });
 
       git.add(".", () => {
-        console.log('add함')
+        console.log('add함', arguments)
       }).commit(`commit - ${newProcName}`).push("origin", "master", ['--force']);
 
       // 신규 watch 또는 패키지 변경일 경우 메모리에 저장
