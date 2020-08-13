@@ -1,1 +1,393 @@
-undefined
+
+  CREATE OR REPLACE PACKAGE "CISADM"."CM_B917S_PKG" IS
+TYPE CSR_TYPE IS REF CURSOR;
+/**
+================================================================================
+PROGRAM NAME     : CM_B916S_PKG
+CREATED BY       : 김일영
+CREATED DATE     : 2020-07-16
+LAST UPDATED BY  : 김일영
+LAST UPDATE DATE :
+PURPOSE          :  부가세 금액수정(합산)
+VERSION          : 1.0
+COMMENT          : 부가세 금액수정(합산)
+================================================================================
+CHANGE HISTORY
+--------------------------------------------------------------------------------
+DATE        NAME          DESCRIPTION
+----------- ------------  ------------------------------------------------------
+2012-01-17  김일영 최종작성
+================================================================================
+**/
+
+
+
+/*================================================================================
+PROGRAM NAME     : main_query
+CREATED BY       : 김일영
+CREATED DATE     : 2020-07-16
+LAST UPDATED BY  : 김일영
+LAST UPDATE DATE :
+PURPOSE          :  부가세 데이타에 대한 조회
+VERSION          : 1.0
+COMMENT          :  부가세 데이타에 대한 조회
+================================================================================*/
+PROCEDURE main_query(
+
+       O_CSR            OUT CSR_TYPE,
+       O_ERR            OUT VARCHAR2,
+       V_USERID         IN  VARCHAR2,   -- 필수 : 사용자 아이디
+       V_LANG           IN  VARCHAR2,   -- 필수 : 시스템 언어
+       V_IP             IN  VARCHAR2,   -- 필수 : 사용자 IP
+       p_acct_id        IN  CHAR,--납부자번호
+       p_tax_yymm       in varchar2,--부가세 년월
+       p_charg_yymm     in varchar2 --청구년월
+       
+         
+       ) ;
+
+
+/*================================================================================
+PROGRAM NAME     : execute
+CREATED BY       : 김일영
+CREATED DATE     : 2020-07-21
+LAST UPDATED BY  : 김일영
+LAST UPDATE DATE :
+PURPOSE          : 부가세 건에 대해 유형별로 처리를 수행한다.
+VERSION          : 1.0
+COMMENT          : 부가세 건에 대해 유형별로 처리를 수행한다.
+
+=======================================================================================*/
+procedure EXECUTE
+           (
+             O_CSR         OUT CSR_TYPE
+           , O_ERR OUT VARCHAR2
+           , V_USERID      IN  VARCHAR2   -- 필수 : 사용자 아이디
+           , V_LANG        IN  VARCHAR2   -- 필수 : 시스템 언어
+           , V_IP          IN  VARCHAR2   -- 필수 : 사용자 IP
+           , p_acct_id        in  char  -- 납부자
+           , p_bill_cyc_cd    in CHAR --bill_cyc_cd
+           , p_charg_yymm     in varchar2 --청구년월
+           , p_invoice_seq    in varchar2 --invoice_seq 
+           , p_hapsan_list    in varchar2
+     
+) ;      
+/*================================================================================
+PROGRAM NAME     : get_biz_address
+CREATED BY       : 김일영
+CREATED DATE     : 2020-07-21
+LAST UPDATED BY  : 김일영
+LAST UPDATE DATE :
+PURPOSE          : 사업장 주소 구하기
+VERSION          : 1.0
+COMMENT          : 사업장 주소 구하기
+
+=======================================================================================*/
+function get_biz_address (p_acct_id char) return varchar2;
+                                                                                                                                    
+END ;
+
+CREATE OR REPLACE PACKAGE BODY "CISADM"."CM_B917S_PKG" IS
+/**
+================================================================================
+PROGRAM NAME     : CM_B917S_PKG
+CREATED BY       : 김일영
+CREATED DATE     : 2020-07-16
+LAST UPDATED BY  : 김일영
+LAST UPDATE DATE :
+PURPOSE          : 합산대상 세금계산서 선택팝업 및 합산실행
+VERSION          : 1.0
+COMMENT          : 합산대상 세금계산서 선택팝업 및 합산실행
+================================================================================
+CHANGE HISTORY
+--------------------------------------------------------------------------------
+DATE        NAME          DESCRIPTION
+----------- ------------  ------------------------------------------------------
+2020-08-17  김일영 최종작성
+================================================================================
+**/
+
+
+
+/*================================================================================
+PROGRAM NAME     : main_query
+CREATED BY       : 김일영
+CREATED DATE     : 2020-07-16
+LAST UPDATED BY  : 김일영
+LAST UPDATE DATE :
+PURPOSE          :  합산대상 세금계산서 조회
+VERSION          : 1.0
+COMMENT          :  합산대상 세금계산서 조회
+================================================================================*/
+PROCEDURE main_query(
+
+       O_CSR            OUT CSR_TYPE,
+       O_ERR            OUT VARCHAR2,
+       V_USERID         IN  VARCHAR2,   -- 필수 : 사용자 아이디
+       V_LANG           IN  VARCHAR2,   -- 필수 : 시스템 언어
+       V_IP             IN  VARCHAR2,   -- 필수 : 사용자 IP
+       p_acct_id        IN  CHAR,--납부자번호
+       p_tax_yymm       in varchar2,--부가세 년월
+       p_charg_yymm     in varchar2 --청구년월
+       
+         
+       ) IS
+   
+begin
+  
+   
+   --합산납부번호,차분,납부자명,상호,사업자등록번호,대표자명,업태,업종,부가세여부,주소,전입일
+   open o_csr for
+   select 
+          regexp_replace(bi.cm_stax_yymm, '([0-9]{4})([0-9]{2})', '\1-\2') as CM_B100S_T1 -- 부가세년월
+        , to_char(bi.cm_isu_dt, 'YYYY-MM-DD') as CM_B100S_T2 -- 작성일자
+        , nvl(bi.cm_confirm_yn,'N') as CM_B100S_T3 -- 집계여부
+        , substr(bi.cm_charg_yymm, 1, 4) ||'-'||substr( bi.cm_charg_yymm, 5, 2 )         CM_B100S_T4    -- 청구년월
+        , bi.bill_cyc_cd           CM_B100S_T5   -- 차분
+        , bi.cm_invoice_seq        CM_B100S_T6   -- 순번
+        , bi.acct_id               CM_B100S_T9    -- 납부자번호
+                    
+
+     FROM
+          cm_btax_invoice  BI
+        
+
+    WHERE 1 = 1
+      AND bi.cm_stax_yymm  = REPLACE( p_tax_yymm, '-', '')
+      and bi.cm_charg_yymm = REPLACE( p_charg_yymm, '-', '')
+      and bi.bill_cyc_cd in ('01','02','03','04') 
+      and bi.acct_id=p_acct_id
+      and bi.cm_tot_stax <> 0
+      order by cm_invoice_seq asc;
+        
+     
+    
+end;    
+
+/*================================================================================
+PROGRAM NAME     : execute
+CREATED BY       : 김일영
+CREATED DATE     : 2020-07-21
+LAST UPDATED BY  : 김일영
+LAST UPDATE DATE :
+PURPOSE          : 선택된 데이타에 대해 합산으로 세금계산서를 발행한다.
+VERSION          : 1.0
+COMMENT          : 선택된 데이타에 대해 합산으로 세금계산서를 발행한다.
+
+=======================================================================================*/
+procedure EXECUTE
+           (
+             O_CSR         OUT CSR_TYPE
+           , O_ERR OUT VARCHAR2
+           , V_USERID      IN  VARCHAR2   -- 필수 : 사용자 아이디
+           , V_LANG        IN  VARCHAR2   -- 필수 : 시스템 언어
+           , V_IP          IN  VARCHAR2   -- 필수 : 사용자 IP
+           , p_acct_id        in  char  -- 납부자
+           , p_bill_cyc_cd    in CHAR    --bill_cyc_cd
+           , p_charg_yymm     in varchar2 --청구년월
+           , p_invoice_seq    in varchar2 --invoice_seq 
+           , p_hapsan_list    in varchar2
+     
+) is 
+   x_invoice_seq number;
+   x_result_code varchar2(1);
+   x_result_desc varchar2(500);
+   x_rec  cm_btax_invoice%rowtype;
+   x_list_rec cm_btax_hapsan_hist%rowtype;
+begin
+  --null;
+   if p_hapsan_list is null then
+      o_err :='err 합산대상 납부번호가 선택되지 않았습니다';
+      return;
+   end if;
+   x_invoice_seq :=p_invoice_seq;
+	 
+   select *
+   into   x_rec
+   from   cm_btax_invoice bi
+   where  bi.acct_id=p_acct_id
+   and    bi.cm_charg_yymm=p_charg_yymm
+   and    bi.bill_cyc_cd=p_bill_cyc_cd
+   and    bi.cm_invoice_seq=p_invoice_seq;
+   if x_rec.cm_trans_yn='N' then 
+      update cm_btax_invoice bi
+      set    bi.cm_tax_invoice_yn='T'
+            ,bi.cm_rmk='합산으로 인한 신고금액수정'
+            ,bi.cm_mody_code='AB'
+            ,bi.cm_updated_dttm=sysdate
+            ,bi.cm_updated_id=V_USERID
+      where   bi.acct_id=p_acct_id
+      and    bi.cm_charg_yymm=p_charg_yymm
+      and    bi.bill_cyc_cd=p_bill_cyc_cd
+      and    bi.cm_invoice_seq=p_invoice_seq;
+      x_rec.cm_invoice_seq :=p_invoice_seq + 1;
+   else 
+      cm_b914s_pkg.insert_btax_mod(p_charg_yymm => p_charg_yymm
+                               ,p_bill_cyc_cd => p_bill_cyc_cd
+                               ,p_acct_id => p_acct_id
+                               ,p_seq => x_invoice_seq
+                               ,p_emp_cd => V_USERID
+                               ,p_gubun => '80' --합산으로 인한 신고금액수정
+                               ,p_adjust_dt => trunc(sysdate)
+                               ,p_result_code => x_result_code
+                               ,p_result_desc => x_result_desc
+                               ,p_mody_code => 'AB'
+                               ,p_remarks => '합산으로 인한 신고금액수정'
+                               );
+      if x_result_code <> '0' then
+         o_err :='err 처리중 에러가 발생했습니다:' || x_result_desc ;                        
+         rollback;
+         return;
+      end if;
+      x_rec.cm_invoice_seq :=  p_invoice_seq + 2;                      
+      x_rec.cm_dl_dt    :=  trunc(sysdate);
+   end if;
+   x_rec.cm_gubun        :='80';
+   x_rec.cm_rmk          :='합산으로 인한 신고금액수정';
+   x_rec.cm_invoice_seq  := p_invoice_seq + 2;
+   x_rec.cm_updated_id   := V_USERID;
+   x_rec.cm_updated_dttm := sysdate;
+   x_rec.cm_trans_yn     := 'N';
+   x_rec.cm_trans_id     := null;
+   x_rec.cm_trans_dt     := null;
+   x_rec.cm_mod_invoice_yn :='Y';
+   x_rec.cm_mody_code    :='AB';
+   x_rec.cm_confirm_yn   :='N';
+  
+   
+   
+   x_list_rec.cm_charg_yymm := p_charg_yymm;
+   x_list_rec.bill_cyc_cd   := p_bill_cyc_cd;
+   x_list_rec.acct_id       := p_acct_id;
+   x_list_rec.cm_invoice_seq:= p_invoice_seq;
+   x_list_rec.cm_created_id := V_USERID;
+   x_list_rec.cm_created_dttm :=sysdate;
+   x_list_rec.cm_updated_id   :=V_USERID;
+   x_list_rec.cm_updated_dttm :=sysdate;
+   x_list_rec.version         :=1;
+   
+	 --nodatafound
+   select  a.cm_biz_reg_no  as dman_reg_no 
+          ,a.cm_trade_nm as damn_trd_nm 
+          ,a.cm_rptv as dman_rptv 
+          ,trim(e.postal) as damn_zipcd 
+         
+          ,a.cm_biz_conditions as dman_bsn_st
+          ,a.cm_ind_type as dman_inds_tp 
+          ,case when a.cm_biz_addr_yn='Y' then 
+              a.cm_biz_address
+           else
+             get_biz_address(a.acct_id) 
+           end   
+   into   x_rec.cm_dman_reg_no
+         ,x_rec.cm_damn_trd_nm
+         ,x_rec.cm_dman_rptv
+         ,x_rec.cm_damn_zipcd
+         ,x_rec.cm_dman_bsn_st
+         ,x_rec.cm_dman_inds_tp
+         ,x_rec.cm_dman_addr       
+   from   cm_btax_master_vw a ,
+          ci_acct acct,
+          ci_prem e
+          
+   where  a.acct_id=p_acct_id
+   and    a.acct_id=acct.acct_id
+   and    acct.mailing_prem_id=e.prem_id(+);
+ 
+   for s_rec in(select row_num,
+                max(decode(gubun,0,trim(txt),'')) g1,--청구년월
+                max(decode(gubun,1,trim(txt),'')) g2,--bill_cyc_cd
+                max(decode(gubun,2,txt,'')) g3,--일련번호
+                max(decode(gubun,3,txt,'')) g4 --납부번호
+                from   
+               (
+               SELECT  regexp_substr(A.TXT, '[^:]+', 1, LEVEL) TXT,mod(level-1,4) gubun,trunc((level-1)/4) + 1 as row_num
+                  FROM (SELECT p_hapsan_list TXT FROM dual) A
+               CONNECT BY LEVEL <= length(regexp_replace(A.TXT, '[^:]+',''))+1 )
+               group by row_num ) loop
+      select 
+            bi.cm_tot_sply_amt + x_rec.cm_tot_sply_amt
+           ,bi.cm_tot_stax + x_rec.cm_tot_stax
+           ,bi.cm_tot_ssum + x_rec.cm_tot_ssum
+           ,bi.cm_base_fee + x_rec.cm_base_fee
+           ,bi.cm_use_fee1 + x_rec.cm_use_fee1
+           ,bi.cm_use_fee2 + x_rec.cm_use_fee2
+           ,bi.cm_use_ssum + x_rec.cm_use_ssum
+           ,bi.cm_gmcf + x_rec.cm_gmcf
+           ,bi.cm_stax1 + x_rec.cm_stax1
+           ,bi.cm_stax2 + x_rec.cm_stax2
+           ,bi.cm_discount_amt + x_rec.cm_discount_amt
+      into 
+            x_rec.cm_tot_sply_amt
+           ,x_rec.cm_tot_stax
+           ,x_rec.cm_tot_ssum
+           ,x_rec.cm_base_fee
+           ,x_rec.cm_use_fee1
+           ,x_rec.cm_use_fee2
+           ,x_rec.cm_use_ssum
+           ,x_rec.cm_gmcf
+           ,x_rec.cm_stax1
+           ,x_rec.cm_stax2
+           ,x_rec.cm_discount_amt
+      from   cm_btax_invoice  bi
+      where  bi.cm_charg_yymm=s_rec.g1
+      and    bi.bill_cyc_cd=  CAST(s_rec.g2  AS CHAR(4))
+      and    bi.cm_invoice_seq=s_rec.g3
+      and    bi.acct_id= cast(s_rec.g4 AS CHAR(10));   
+			
+      x_list_rec.cm_btax_hapsan_hist_seq :=cm_btax_hapsan_hist_s.nextval;
+      x_list_rec.source_charg_yymm       :=s_rec.g1;
+      x_list_rec.source_bill_cyc_cd      :=s_rec.g2;
+      x_list_rec.source_acct_id          :=s_rec.g4;
+      x_list_rec.source_invoice_seq      :=s_rec.g3;
+      insert into cm_btax_hapsan_hist
+      values x_list_rec;    
+   end loop;
+   insert into cm_btax_invoice
+   values x_rec;
+end;
+/*================================================================================
+PROGRAM NAME     : get_biz_address
+CREATED BY       : 김일영
+CREATED DATE     : 2020-07-21
+LAST UPDATED BY  : 김일영
+LAST UPDATE DATE :
+PURPOSE          : 사업장 주소 구하기
+VERSION          : 1.0
+COMMENT          : 사업장 주소 구하기
+
+=======================================================================================*/
+function get_biz_address (p_acct_id char) return varchar2 is
+   x_address varchar2(1000);
+begin
+   select decode(trim(f.bill_addr_srce_flg),
+                          'ACOV',
+                          (trim(g.geo_code) || ' ' || trim(g.address1) || ' ' ||
+                          trim(g.address4) || ' ' || trim(g.num1) || ' ' ||
+                          decode(trim(g.num2), '', '', '-' || trim(g.num2))),
+                          'PREM',
+                          (trim(e.geo_code) || ' ' || trim(e.address1) || ' ' ||
+                          trim(e.address4) || ' ' || trim(e.num1) || ' ' ||
+                          decode(trim(e.num2), '', '', '-' || trim(e.num2)))) || ' ' ||
+                   decode(trim(f.bill_addr_srce_flg),
+                          'ACOV',
+                          g.city,
+                          'PREM',
+                          (select srch_char_val
+                             from ci_prem_char
+                            where char_type_cd = 'CM_HO_NM'
+                              and prem_id = e.prem_id))
+   into x_address               
+   from ci_acct c, ci_prem e, ci_acct_per f, ci_per_addr_ovrd g
+   where 1 = 1
+     and c.mailing_prem_id = e.prem_id
+     and c.acct_id = f.acct_id
+     and f.acct_id = g.acct_id(+)
+     and c.acct_id = p_acct_id;
+   return x_address;
+            
+exception when others then
+   return null;
+end;
+        
+END ;
