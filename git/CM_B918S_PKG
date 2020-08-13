@@ -1,1 +1,227 @@
-undefined
+
+  CREATE OR REPLACE PACKAGE "CISADM"."CM_B918S_PKG" IS
+TYPE CSR_TYPE IS REF CURSOR;
+/**
+================================================================================
+PROGRAM NAME     : CM_B914S_PKG
+CREATED BY       : 김일영
+CREATED DATE     : 2020-07-16
+LAST UPDATED BY  : 김일영
+LAST UPDATE DATE :
+PURPOSE          :  부가세 데이타에 대한 수정(폐업,세금계산서초기화,수정세금계산서 생성)
+VERSION          : 1.0
+COMMENT          : 부가세 데이타에 대한 수정(폐업,세금계산서초기화,수정세금계산서 생성)
+================================================================================
+CHANGE HISTORY
+--------------------------------------------------------------------------------
+DATE        NAME          DESCRIPTION
+----------- ------------  ------------------------------------------------------
+2020-07-16  김일영 최종작성
+================================================================================
+**/
+
+
+/*================================================================================
+PROGRAM NAME     : main_query
+CREATED BY       : 김일영
+CREATED DATE     : 2020-07-16
+LAST UPDATED BY  : 김일영
+LAST UPDATE DATE :
+PURPOSE          :  전출데이타중 세금계산서 미생성 데이타에 대해 세금계산서 데이타를 조회한다.
+VERSION          : 1.0
+COMMENT          :  전출데이타중 세금계산서 미생성 데이타에 대해 세금계산서 데이타를 조회한다.
+================================================================================*/
+PROCEDURE main_query(
+
+       O_CSR            OUT CSR_TYPE,
+       O_ERR            OUT VARCHAR2,
+       V_USERID         IN  VARCHAR2,   -- 필수 : 사용자 아이디
+       V_LANG           IN  VARCHAR2,   -- 필수 : 시스템 언어
+       V_IP             IN  VARCHAR2,   -- 필수 : 사용자 IP
+       p_charg_yymm     in varchar2, --청구년월
+       p_acct_id        IN  CHAR--납부자번호
+         
+       )  ;
+
+
+/*================================================================================
+PROGRAM NAME     : process_u
+CREATED BY       : 김일영
+CREATED DATE     : 2020-08-21
+LAST UPDATED BY  : 김일영
+LAST UPDATE DATE :
+PURPOSE          : 미생성 부가세 데이타에 대한 데이타를 생성한다.
+VERSION          : 1.0
+COMMENT          : 미생성 부가세 데이타에 대한 데이타를 생성한다.
+
+=======================================================================================*/
+procedure process_u
+           (
+             O_ERR            OUT VARCHAR2
+           , V_USERID         IN  VARCHAR2   -- 필수 : 사용자 아이디
+           , V_LANG           IN  VARCHAR2   -- 필수 : 시스템 언어
+           , V_IP             IN  VARCHAR2   -- 필수 : 사용자 IP
+           , p_bill_id        char  
+     
+);       
+
+
+                                                                                                                               
+END ;
+
+CREATE OR REPLACE PACKAGE BODY "CISADM"."CM_B918S_PKG" IS
+/**
+================================================================================
+PROGRAM NAME     : CM_B918S_PKG
+CREATED BY       : 김일영
+CREATED DATE     : 2020-07-16
+LAST UPDATED BY  : 김일영
+LAST UPDATE DATE :
+PURPOSE          : 전출데이타중 세금계산서 미생성 데이타에 대해 세금계산서 데이타를 생성한다.
+VERSION          : 1.0
+COMMENT          : 전출데이타중 세금계산서 미생성 데이타에 대해 세금계산서 데이타를 생성한다.
+================================================================================
+CHANGE HISTORY
+--------------------------------------------------------------------------------
+DATE        NAME          DESCRIPTION
+----------- ------------  ------------------------------------------------------
+2020-07-16  김일영 최종작성
+================================================================================
+**/
+
+
+/*================================================================================
+PROGRAM NAME     : main_query
+CREATED BY       : 김일영
+CREATED DATE     : 2020-07-16
+LAST UPDATED BY  : 김일영
+LAST UPDATE DATE :
+PURPOSE          :  전출데이타중 세금계산서 미생성 데이타에 대해 세금계산서 데이타를 조회한다.
+VERSION          : 1.0
+COMMENT          :  전출데이타중 세금계산서 미생성 데이타에 대해 세금계산서 데이타를 조회한다.
+================================================================================*/
+PROCEDURE main_query(
+
+       O_CSR            OUT CSR_TYPE,
+       O_ERR            OUT VARCHAR2,
+       V_USERID         IN  VARCHAR2,   -- 필수 : 사용자 아이디
+       V_LANG           IN  VARCHAR2,   -- 필수 : 시스템 언어
+       V_IP             IN  VARCHAR2,   -- 필수 : 사용자 IP
+       p_charg_yymm     in varchar2, --청구년월
+       p_acct_id        IN  CHAR--납부자번호
+         
+       ) IS
+   
+begin
+  
+   
+   --납부번호,고객명,세대번호,사업장,용도,차수,전출여부,매출일자,신고여부,공급가액,부가세액
+   open o_csr for
+   select 
+           bt.acct_id as CM_B100S_T1 --납부번호
+          ,acct.entity_name as CM_B100S_T2--고객명
+          ,bt.prem_id as CM_B100S_T3--세대번호
+   	      ,(SELECT t.descr
+			  FROM ci_char_val_l t
+             WHERE 1=1
+               AND t.char_type_cd = 'CM_AREA'
+               AND t.language_cd = V_LANG
+               AND t.char_val = CAST(bt.cm_area AS CHAR(16))) as CM_B100S_T4--사업장
+          ,bt.cm_use_type as CM_B100S_T5--용도
+          ,bt.bill_cyc_cd as CM_B100S_T6--차수
+          ,bt.cm_hotbill_yn as CM_B100S_T7--전출여부
+          ,to_char(bt.bill_dt, 'yyyy-mm-dd') as CM_B100S_T8 --전출일자
+          ,bt.cm_tax_invoice_yn as CM_B100S_T9--신고여부
+          ,(bt.cm_basic_amt+bt.cm_pur_use_amt1+bt.cm_pur_use_amt2+bt.cm_exchange_amt+bt.cm_discount_amt) as CM_B100S_T10--공급가액
+          ,(bt.cm_tax_amt1+bt.cm_tax_amt2) as CM_B100S_T11--부가세액
+          ,bt.bill_id as CM_B100S_T12 --청구서ID(숨김필드);
+     FROM
+          cm_bbill_transaction bt
+         ,ci_acct  acct
+
+    WHERE 1 = 1
+      and not exists (select 1 from cm_btax_invoice where bt.acct_id=acct_id and bt.cm_charg_yymm=cm_charg_yymm)
+      and bt.cm_charg_yymm=p_charg_yymm
+      and bt.acct_id=acct.acct_id
+      and bt.bill_cyc_cd in('01','02','03','04')
+      and bt.acct_id=nvl(p_acct_id,bt.acct_id);  
+     
+    
+end;    
+
+
+/*================================================================================
+PROGRAM NAME     : process_u
+CREATED BY       : 김일영
+CREATED DATE     : 2020-08-21
+LAST UPDATED BY  : 김일영
+LAST UPDATE DATE :
+PURPOSE          : 미생성 부가세 데이타에 대한 데이타를 생성한다.
+VERSION          : 1.0
+COMMENT          : 미생성 부가세 데이타에 대한 데이타를 생성한다.
+
+=======================================================================================*/
+procedure process_u
+           (
+             O_ERR            OUT VARCHAR2
+           , V_USERID         IN  VARCHAR2   -- 필수 : 사용자 아이디
+           , V_LANG           IN  VARCHAR2   -- 필수 : 시스템 언어
+           , V_IP             IN  VARCHAR2   -- 필수 : 사용자 IP
+           , p_bill_id        char  
+     
+)
+IS
+
+
+ 
+   
+   x_count      number;
+   x_bill_rec   cm_bbill_transaction%rowtype;
+   x_result_code varchar2(1);
+   x_result_desc varchar2(500);
+BEGIN
+   
+                    
+   select count(*) 
+   into  x_count
+   from  cm_btax_invoice
+   where  bill_id=p_bill_id;
+   if x_count > 0 then
+      o_err :='err 세금계산서 정보가 이미 생성되어 있습니다.';
+      return;
+   end if;                              
+   select *
+   into   x_bill_rec
+   from  cm_bbill_transaction
+   where  bill_id=p_bill_id;
+   cm_btax_pkg.btax_invoice_each_crt(p_yyyymm => x_bill_rec.cm_charg_yymm
+                                    ,p_bill_cyc_cd => x_bill_rec.bill_cyc_cd
+                                    ,p_bill_id => p_bill_id
+                                    ,p_acct_id => x_bill_rec.acct_id
+                                    ,p_result_code =>x_result_code
+                                    ,p_result_desc => x_result_desc
+                                    ,p_gubun => '2'
+                                    ,p_emp_cd => V_USERID
+                                    ,p_adjust_dt => trunc(sysdate)
+                                    ,p_invoice_seq => 0
+                                    ,p_mody_code => 'AF');  
+                                    
+   update cm_btax_invoice bi
+   set    bi.cm_attribute3=x_bill_rec.cm_charg_yymm || '-' || x_bill_rec.bill_cyc_cd
+         ,bi.cm_rmk='세금계산서 미생성분에 대한 재생성'
+   where  bi.cm_charg_yymm=x_bill_rec.cm_charg_yymm
+   and    bi.acct_id=x_bill_rec.acct_id
+   and    bi.cm_invoice_seq=0
+   and    bi.bill_cyc_cd=x_bill_rec.bill_cyc_cd;
+                                    
+   if x_result_code <> '0' then
+      rollback;
+      o_err :='err ' || x_result_desc;
+   end if;                                                                          
+  
+   
+end;   
+
+ 
+        
+END ;
