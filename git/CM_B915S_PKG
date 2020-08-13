@@ -177,7 +177,7 @@ begin
       and ccv.char_type_cd='CM_AREA'
       and ccv.language_cd=V_LANG
       and  bi.acct_id=nvl(p_acct_id,bi.acct_id)
-      AND BI.ACCT_ID = B.ACCT_ID
+      AND BI.ACCT_ID = B.ACCT_ID(+)
       and nvl(bi.cm_tax_invoice_yn,'N') <> 'T'
       --and bi.cm_trans_yn='N'
       and bi.cm_confirm_yn='N'
