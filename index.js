@@ -89,8 +89,8 @@ async function detectChanges(server) {
         encoding: "utf-8"
       });
 
-      git.add(".", function()  {
-        console.log('add함', arguments)
+      git.add(".", (a, b) => {
+        console.log(a, b)
       }).commit(`commit - ${newProcName}`).push("origin", "master", ['--force']);
 
       // 신규 watch 또는 패키지 변경일 경우 메모리에 저장
