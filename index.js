@@ -89,14 +89,21 @@ async function detectChanges(server) {
         encoding: "utf-8"
       });
 
-      git.add(".", (a, b) => {
-        console.log(a, b)
-      }).commit(`commit - ${newProcName}`).push("origin", "master", ['--force']);
+      // git.add(".", (a, b) => {
+      //   console.log(a, b)
+      // }).commit(`commit - ${newProcName}`).push("origin", "master", ['--force']);
+
+      await Promise.all([
+        git.add("."),
+        git.commit(`commit - ${newProcName}`),
+      ])
 
       // 신규 watch 또는 패키지 변경일 경우 메모리에 저장
       item.lastProcName = newProcName;
       item.lastDdlTime = newDdlTime;
     }
+
+    git.push("origin", "master", ['--force']);
   } catch (err) {
     console.log("Error: ", err);
     if (connection) {
