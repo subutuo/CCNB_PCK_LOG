@@ -97,7 +97,7 @@ async function detectChanges(server) {
       item.lastDdlTime = newDdlTime;
     }
 
-    await git.push("origin", "master", ['--force']);
+    await git.push("origin", "master");
   } catch (err) {
     console.log("Error: ", err);
     if (connection) {
