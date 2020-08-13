@@ -1,0 +1,237 @@
+
+  CREATE OR REPLACE PACKAGE "CISADM"."CM_B911P_PKG" IS
+/**
+================================================================================
+PROGRAM NAME     : CM_B911P_PKG
+CREATED BY       : 김일영
+CREATED DATE     : 2020-07-15
+LAST UPDATED BY  : 김일영
+LAST UPDATE DATE :
+PURPOSE          :  CM_B911P_PKG
+VERSION          : 1.0
+COMMENT          : 세금계산서 신청 안내카톡 문자 발송 팝업
+================================================================================
+CHANGE HISTORY
+--------------------------------------------------------------------------------
+DATE        NAME          DESCRIPTION
+----------- ------------  ------------------------------------------------------
+2020-05-26  김일영 최종작성
+================================================================================
+**/
+TYPE CSR_TYPE IS REF CURSOR;
+
+/*\*================================================================================
+PROGRAM NAME     : main_query
+CREATED BY       : 김일영
+CREATED DATE     : 2020-07-15
+LAST UPDATED BY  : 김일영
+LAST UPDATE DATE :
+PURPOSE          : 세금계산서 안내에 대한 카톡 메시지를 조회
+VERSION          : 1.0
+COMMENT          : 세금계산서 안내에 대한 카톡 메시지를 조회
+
+=======================================================================================*/
+
+PROCEDURE main_query(
+
+       O_CSR            OUT CSR_TYPE,
+       O_ERR            OUT VARCHAR2,
+       V_USERID         IN  VARCHAR2,   -- 필수 : 사용자 아이디
+       V_LANG           IN  VARCHAR2,   -- 필수 : 시스템 언어
+       V_IP             IN  VARCHAR2    -- 필수 : 사용자 IP         
+       );
+  
+                   
+
+/*================================================================================
+PROGRAM NAME     : transfer
+CREATED BY       : 김일영
+CREATED DATE     : 2020-07-15
+LAST UPDATED BY  : 김일영
+LAST UPDATE DATE :
+PURPOSE          : 카톡 보내기
+VERSION          : 1.0
+COMMENT          : 카톡 보내기
+=======================================================================================*/
+PROCEDURE  transfer_a
+           (
+            
+             O_ERR OUT VARCHAR2,
+             V_USERID      IN  VARCHAR2,   -- 필수 : 사용자 아이디
+             V_LANG        IN  VARCHAR2,   -- 필수 : 시스템 언어
+             V_IP          IN  VARCHAR2,   -- 필수 : 사용자 IP
+             p_acct_id     IN  varchar2,/*납부자번호*/
+             p_from_telno  in varchar2 ,--발신번호
+             p_to_telno    in varchar2 --수신번호
+             ) ;
+
+                                                    
+END ;
+
+CREATE OR REPLACE PACKAGE BODY "CISADM"."CM_B911P_PKG" IS
+/**
+================================================================================
+PROGRAM NAME     : CM_B911P_PKG
+CREATED BY       : 김일영
+CREATED DATE     : 2020-07-15
+LAST UPDATED BY  : 김일영
+LAST UPDATE DATE :
+PURPOSE          :  CM_B911P_PKG
+VERSION          : 1.0
+COMMENT          : 세금계산서 신청 안내카톡 문자 발송 팝업
+================================================================================
+CHANGE HISTORY
+--------------------------------------------------------------------------------
+DATE        NAME          DESCRIPTION
+----------- ------------  ------------------------------------------------------
+2020-05-26  김일영 최종작성
+================================================================================
+**/
+
+
+/*\*================================================================================
+PROGRAM NAME     : main_query
+CREATED BY       : 김일영
+CREATED DATE     : 2020-07-15
+LAST UPDATED BY  : 김일영
+LAST UPDATE DATE :
+PURPOSE          : 세금계산서 안내에 대한 카톡 메시지를 조회
+VERSION          : 1.0
+COMMENT          : 세금계산서 안내에 대한 카톡 메시지를 조회
+
+=======================================================================================*/
+
+PROCEDURE main_query(
+
+       O_CSR            OUT CSR_TYPE,
+       O_ERR            OUT VARCHAR2,
+       V_USERID         IN  VARCHAR2,   -- 필수 : 사용자 아이디
+       V_LANG           IN  VARCHAR2,   -- 필수 : 시스템 언어
+       V_IP             IN  VARCHAR2    -- 필수 : 사용자 IP
+       ) IS
+   
+begin
+  
+   --x_pre_from_date :=add_months(to_date(replace(p_yyyymm,'-',''),'YYYYMM'),-1);
+   --x_param := v_userid || ':' || v_lang || ':' || v_ip || ':' || p_cm_charg_yymm || ':' || p_bill_cycle ;  
+   open o_csr for
+   select 
+          m.cm_msg_context as CM_B100S_T1, --카톡내용
+          m.cm_from_telno AS CM_B100S_T2 -- 발신번호
+   from   cm_mmsg_context m
+   where  m.cm_msg_id='00237';
+   
+
+    
+end;    
+
+
+
+/*================================================================================
+PROGRAM NAME     : transfer
+CREATED BY       : 김일영
+CREATED DATE     : 2020-07-15
+LAST UPDATED BY  : 김일영
+LAST UPDATE DATE :
+PURPOSE          : 카톡 보내기
+VERSION          : 1.0
+COMMENT          : 카톡 보내기
+=======================================================================================*/
+PROCEDURE  transfer_a
+           (
+            
+             O_ERR OUT VARCHAR2,
+             V_USERID      IN  VARCHAR2,   -- 필수 : 사용자 아이디
+             V_LANG        IN  VARCHAR2,   -- 필수 : 시스템 언어
+             V_IP          IN  VARCHAR2,   -- 필수 : 사용자 IP
+             p_acct_id     IN  varchar2,/*납부자번호*/
+             p_from_telno  in varchar2 ,--발신번호
+             p_to_telno    in varchar2 --수신번호
+             ) is
+   
+            v_DB_NAME VARCHAR2(9);
+            v_URL VARCHAR2(2000);
+BEGIN
+    
+             -- pkg_crypto.encrypt(p_acct_id)
+               SELECT NAME
+                 INTO v_DB_NAME
+                 FROM v$database;
+               
+               IF v_db_name = 'KDCCNB' -- 운영
+                   THEN
+                       v_URL := 'https://www.kdgas.co.kr/TRANSFER/uploadCert01.php?acctId=' || p_acct_id;
+--                       v_URL := 'https://www.kdgas.co.kr/AHOME/uploadCert/index.php?acctId=' || pkg_crypto.encrypt(p_acct_id);
+                   ELSE 
+                       v_URL := 'http://kdgas.5tory.com/TRANSFER/uploadCert01.php?acctId=' || p_acct_id;
+--                       v_URL := 'http://kdgas.5tory.com/AHOME/uploadCert/index.php?acctId=' || pkg_crypto.encrypt(p_acct_id);
+               END IF;
+               
+               
+   
+              insert into cm_mmsg_dispatch
+              (
+                 cm_dispatch_id                ,/*발송ID*/
+                 cm_msg_id                     ,/*메시지ID*/
+                 per_id                        ,/*고객번호*/
+                 cm_per_name                   ,/*고객명*/
+                 cm_from_telno                 ,/*발신번호*/
+                 cm_to_telno                   ,/*수신번호*/
+                 cm_reserve_dttm               ,/*발송예약일시*/
+                 cm_error_chk_sw               ,/*오류처리여부*/
+                 cm_msg_context                ,/*발송문구*/
+                 cm_dept_cd                    ,/*발송부서코드*/
+                 cm_re_disp_sw                 ,/*재발송여부*/
+                 cm_cdr_id                     ,/*과금ID*/
+                 cm_msg_type                   ,/*문자타입*/
+                 cm_connection_key             ,/*연결KEY*/
+                 cm_created_id                 ,/*생성자ID*/
+                 cm_created_dttm               ,/*생성일시*/
+                 cm_updated_id                 ,/*수정자ID*/
+                 cm_updated_dttm               ,/*수정일시*/
+                 version                       ,/*VERSION*/
+                 cm_service_seqno              ,/*알림톡 서비스 코드*/
+                 cm_template_code               /*알림톡 템플릿 코드*/
+              )
+              select 
+                 cm_mmsg_dispatch_s.nextval            ,/*발송ID*/
+                 '00237'                               ,/*메시지ID*/
+                 ''                                    ,/*고객번호*/
+                 acct.entity_name                      ,/*고객명*/
+                 p_from_telno                          ,/*발신번호*/
+                 p_to_telno                            ,/*수신번호*/
+                 sysdate                               ,/*발송예약일시*/
+                 'N'                                   ,/*오류처리여부*/
+                 replace(cc.cm_msg_context, '&P1', v_URL),/*발송문구*/
+                 ''                                    ,/*발송부서코드*/
+                 'N'                                   ,/*재발송여부*/
+                 '1'                                   ,/*과금ID*/
+                 'KKO'                                 ,/*문자타입*/ -- 나중에 KKO로
+                 p_acct_id                             ,/*연결KEY*/
+                 V_USERID                              ,/*생성자ID*/
+                 sysdate                               ,/*생성일시*/
+                 V_USERID                              ,/*수정자ID*/
+                 sysdate                               ,/*수정일시*/
+                 1                                     ,/*VERSION*/
+                 cc.cm_service_seqno                   ,/*알림톡 서비스 코드*/
+                 cc.cm_template_code                    /*알림톡 템플릿 코드*/
+                                
+              from  ci_acct acct,
+                   cm_mmsg_context cc
+              where acct.acct_id=p_acct_id
+              and   cc.cm_msg_id='00237'; 
+
+              
+            
+           
+ 
+exception when others then
+   o_err :='err ' || sqlcode || '-' || sqlerrm;  
+                                          
+   rollback; 
+end;
+
+
+
+
+END ;

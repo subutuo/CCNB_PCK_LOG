@@ -1,0 +1,171 @@
+
+  CREATE OR REPLACE PACKAGE "CISADM"."CM_B916S_PKG" IS
+TYPE CSR_TYPE IS REF CURSOR;
+/**
+================================================================================
+PROGRAM NAME     : CM_B916S_PKG
+CREATED BY       : 김일영
+CREATED DATE     : 2020-07-16
+LAST UPDATED BY  : 김일영
+LAST UPDATE DATE :
+PURPOSE          :  부가세 금액수정(합산)
+VERSION          : 1.0
+COMMENT          : 부가세 금액수정(합산)
+================================================================================
+CHANGE HISTORY
+--------------------------------------------------------------------------------
+DATE        NAME          DESCRIPTION
+----------- ------------  ------------------------------------------------------
+2012-01-17  김일영 최종작성
+================================================================================
+**/
+
+
+
+/*================================================================================
+PROGRAM NAME     : main_query
+CREATED BY       : 김일영
+CREATED DATE     : 2020-07-16
+LAST UPDATED BY  : 김일영
+LAST UPDATE DATE :
+PURPOSE          :  부가세 데이타에 대한 조회
+VERSION          : 1.0
+COMMENT          :  부가세 데이타에 대한 조회
+================================================================================*/
+PROCEDURE main_query(
+
+       O_CSR            OUT CSR_TYPE,
+       O_ERR            OUT VARCHAR2,
+       V_USERID         IN  VARCHAR2,   -- 필수 : 사용자 아이디
+       V_LANG           IN  VARCHAR2,   -- 필수 : 시스템 언어
+       V_IP             IN  VARCHAR2,   -- 필수 : 사용자 IP
+       p_acct_id        IN  CHAR,--납부자번호
+       p_tax_yymm       in varchar2,--부가세 년월
+       p_charg_yymm     in varchar2 --청구년월
+       
+         
+       ) ;
+
+
+      
+
+                                                                                                                                    
+END ;
+
+CREATE OR REPLACE PACKAGE BODY "CISADM"."CM_B916S_PKG" IS
+/**
+================================================================================
+PROGRAM NAME     : CM_B916S_PKG
+CREATED BY       : 김일영
+CREATED DATE     : 2020-07-16
+LAST UPDATED BY  : 김일영
+LAST UPDATE DATE :
+PURPOSE          :  부가세 금액수정(합산)
+VERSION          : 1.0
+COMMENT          : 부가세 금액수정(합산)
+================================================================================
+CHANGE HISTORY
+--------------------------------------------------------------------------------
+DATE        NAME          DESCRIPTION
+----------- ------------  ------------------------------------------------------
+2012-01-17  김일영 최종작성
+================================================================================
+**/
+
+
+
+/*================================================================================
+PROGRAM NAME     : main_query
+CREATED BY       : 김일영
+CREATED DATE     : 2020-07-16
+LAST UPDATED BY  : 김일영
+LAST UPDATE DATE :
+PURPOSE          :  부가세 데이타에 대한 조회
+VERSION          : 1.0
+COMMENT          :  부가세 데이타에 대한 조회
+================================================================================*/
+PROCEDURE main_query(
+
+       O_CSR            OUT CSR_TYPE,
+       O_ERR            OUT VARCHAR2,
+       V_USERID         IN  VARCHAR2,   -- 필수 : 사용자 아이디
+       V_LANG           IN  VARCHAR2,   -- 필수 : 시스템 언어
+       V_IP             IN  VARCHAR2,   -- 필수 : 사용자 IP
+       p_acct_id        IN  CHAR,--납부자번호
+       p_tax_yymm       in varchar2,--부가세 년월
+       p_charg_yymm     in varchar2 --청구년월
+       
+         
+       ) IS
+   
+begin
+  
+   
+   --합산납부번호,차분,납부자명,상호,사업자등록번호,대표자명,업태,업종,부가세여부,주소,전입일
+   open o_csr for
+   select 
+          regexp_replace(bi.cm_stax_yymm, '([0-9]{4})([0-9]{2})', '\1-\2') as CM_B100S_T1 -- 부가세년월
+        , to_char(bi.cm_isu_dt, 'YYYY-MM-DD') as CM_B100S_T2 -- 작성일자
+        , nvl(bi.cm_confirm_yn,'N') as CM_B100S_T3 -- 집계여부
+        , substr(bi.cm_charg_yymm, 1, 4) ||'-'||substr( bi.cm_charg_yymm, 5, 2 )         CM_B100S_T4    -- 청구년월
+        , bi.bill_cyc_cd           CM_B100S_T5   -- 차분
+        , bi.cm_invoice_seq        CM_B100S_T6   -- 순번
+        , (select bc.buyr_code
+           from cm_btax_cust_info bc
+           where bc.acct_id = bi.acct_id)     CM_B100S_T7   -- 종사업장 
+        , ccv.descr   CM_B100S_T8   -- 사업장
+        , bi.acct_id               CM_B100S_T9    -- 납부자번호
+        , bi.cm_trans_dt                     CM_B100S_T10    --전송일시
+        , DECODE(bi.cm_mod_invoice_yn,'Y','수정','일반')    CM_B100S_T11    --종류 : 수정/일반
+        , (select t.DESCR from ci_lookup t
+            where t.FIELD_NAME = 'CM_BTAX_AMENDE'
+            and t.LANGUAGE_CD = V_LANG
+            and t.FIELD_VALUE = cast(bi.cm_mody_code as char(4)))                     CM_B100S_T12   --재발행사유
+        , to_char(cm_tot_sply_amt, '9,999,999,999,999,999,999,999,999,999,999,999,999,999,999')          CM_B100S_T13  -- NUMBER(22)     공급가액
+        , to_char(cm_tot_stax, '9,999,999,999,999,999,999,999,999,999,999,999,999,999,999')              CM_B100S_T14  -- NUMBER(22)     부가세
+        --, TO_CHAR(CM_TOT_SSUM, '9,999,999,999,999,999,999,999,999,999,999,999,999,999,999')              CM_B100S_T20  -- NUMBER(22)     합계
+/*                  , replace(CM_DMAN_REG_NO,'-','')    CM_B100S_T11    --공급받는자_사업자번호
+        , CM_DAMN_TRD_NM           CM_B100S_T12    -- 공급받는자_상호
+        , BI.CM_ISSU_SEQNO         CM_B100S_T13   -- VARCHAR2(35)   Conversation_id
+        ,(select m.approve_id from xxsb_dti_main@kdgas_prod_dl m where m.conversation_id = bi.cm_issu_seqno) as CM_B100S_T14   -- 승인번호
+        , CM_DMAN_RPTV             CM_B100S_T15   -- 공급받는자_대표자
+        , CM_DMAN_ADDR             CM_B100S_T16   -- 공급받는자_주소
+        */
+        , nvl(replace(c.byr_com_regno,'-',''),replace(cm_dman_reg_no,'-',''))    CM_B100S_T15    --공급받는자_사업자번호
+        , nvl(c.byr_com_name, bi.cm_damn_trd_nm)           CM_B100S_T16    -- 공급받는자_상호
+        , nvl(c.conversation_id, bi.cm_issu_seqno)         CM_B100S_T17   -- VARCHAR2(35)   Conversation_id
+        , c.approve_id                                    as CM_B100S_T18   -- 승인번호
+        , nvl(c.byr_rep_name,bi.cm_dman_rptv)             CM_B100S_T19   -- 공급받는자_대표자
+        , nvl(c.byr_com_addr,bi.cm_dman_addr)            CM_B100S_T20   -- 공급받는자_주소                     
+
+     FROM
+          cm_btax_invoice  BI
+        , xxsb_dti_main  c
+        , cm_btax_master_vw B
+        , ci_char_val_l     ccv
+
+    WHERE 1 = 1
+      AND bi.cm_stax_yymm  = REPLACE( p_tax_yymm, '-', '')
+      and bi.cm_charg_yymm = REPLACE( p_charg_yymm, '-', '')
+      and bi.bill_cyc_cd in ('01','02','03','04') 
+      and bi.cm_issu_seqno = c.conversation_id(+)
+      and bi.cm_enp_plc_cd=ccv.char_val
+      and ccv.char_type_cd='CM_AREA'
+      and ccv.language_cd=V_LANG
+      and  bi.acct_id=nvl(p_acct_id,bi.acct_id)
+      AND BI.ACCT_ID = B.ACCT_ID
+      --and nvl(bi.cm_tax_invoice_yn,'N') = 'Y'
+      --and bi.cm_trans_yn='N'
+      and bi.cm_tot_stax <> 0
+      order by cm_invoice_seq asc;
+        
+     
+    
+end;    
+
+
+
+
+
+        
+END ;

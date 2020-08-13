@@ -1,0 +1,475 @@
+
+  CREATE OR REPLACE PACKAGE "CISADM"."CM_B922S_PKG" IS
+TYPE CSR_TYPE IS REF CURSOR;
+/**
+================================================================================
+PROGRAM NAME     : CM_B922S_PKG
+CREATED BY       : 김일영
+CREATED DATE     : 2020-07-16
+LAST UPDATED BY  : 김일영
+LAST UPDATE DATE :
+PURPOSE          : 부가세 신고자료 내역조회
+VERSION          : 1.0
+COMMENT          : 부가세 신고자료 내역조회
+================================================================================
+CHANGE HISTORY
+--------------------------------------------------------------------------------
+DATE        NAME          DESCRIPTION
+----------- ------------  ------------------------------------------------------
+2020-07-16  김일영 최종작성
+================================================================================
+**/
+
+
+
+/*================================================================================
+PROGRAM NAME     : main_query1
+CREATED BY       : 김일영
+CREATED DATE     : 2020-07-16
+LAST UPDATED BY  : 김일영
+LAST UPDATE DATE :
+PURPOSE          :  부가세 신고자료 내역조회(회계 DB자료)
+VERSION          : 1.0
+COMMENT          :  부가세 신고자료 내역조회(회계 DB자료)
+================================================================================*/
+PROCEDURE main_query1(
+
+       O_CSR            OUT CSR_TYPE,
+       O_ERR            OUT VARCHAR2,
+       V_USERID         IN  VARCHAR2,   -- 필수 : 사용자 아이디
+       V_LANG           IN  VARCHAR2,   -- 필수 : 시스템 언어
+       V_IP             IN  VARCHAR2,   -- 필수 : 사용자 IP
+       p_yyyy           in varchar2,--년도
+       p_quarter        in varchar2 --분기
+       ) ;
+
+/*================================================================================
+PROGRAM NAME     : main_query2
+CREATED BY       : 김일영
+CREATED DATE     : 2020-07-16
+LAST UPDATED BY  : 김일영
+LAST UPDATE DATE :
+PURPOSE          :  부가세 신고자료 내역조회(CCNBDB자료)
+VERSION          : 1.0
+COMMENT          :  부가세 신고자료 내역조회(CCNBDB자료)
+================================================================================*/
+PROCEDURE main_query2(
+
+       O_CSR            OUT CSR_TYPE,
+       O_ERR            OUT VARCHAR2,
+       V_USERID         IN  VARCHAR2,   -- 필수 : 사용자 아이디
+       V_LANG           IN  VARCHAR2,   -- 필수 : 시스템 언어
+       V_IP             IN  VARCHAR2,   -- 필수 : 사용자 IP
+       p_yyyy           in varchar2,--년도
+       p_quarter        in varchar2 --분기
+       )
+       ;       
+/*================================================================================
+PROGRAM NAME     : download1
+CREATED BY       : 
+CREATED DATE     : 2020-08-06
+LAST UPDATED BY  : 
+LAST UPDATE DATE :
+PURPOSE          : 회계DB자료  다운로드
+VERSION          : 1.0
+COMMENT          : 회계DB자료  다운로드
+=======================================================================================*/
+PROCEDURE  download1
+           (
+           O_CSR            OUT CSR_TYPE,
+           V_USERID         IN  VARCHAR2,   -- 필수 : 사용자 아이디
+           V_LANG           IN  VARCHAR2,   -- 필수 : 시스템 언어
+           p_yyyy           in varchar2,--년도
+           p_quarter        in varchar2 --분기
+          );
+/*================================================================================
+PROGRAM NAME     : download2
+CREATED BY       : 
+CREATED DATE     : 2020-08-06
+LAST UPDATED BY  : 
+LAST UPDATE DATE :
+PURPOSE          : CCNB자료  다운로드
+VERSION          : 1.0
+COMMENT          : CCNB자료  다운로드
+=======================================================================================*/
+PROCEDURE  download2
+           (
+           O_CSR            OUT CSR_TYPE,
+           V_USERID         IN  VARCHAR2,   -- 필수 : 사용자 아이디
+           V_LANG           IN  VARCHAR2,   -- 필수 : 시스템 언어
+           p_yyyy           in varchar2,--년도
+           p_quarter        in varchar2 --분기
+          ) ;
+                                                                                                                                  
+END ;
+
+CREATE OR REPLACE PACKAGE BODY "CISADM"."CM_B922S_PKG" IS
+/**
+================================================================================
+PROGRAM NAME     : CM_B922S_PKG
+CREATED BY       : 김일영
+CREATED DATE     : 2020-07-16
+LAST UPDATED BY  : 김일영
+LAST UPDATE DATE :
+PURPOSE          : 부가세 신고자료 내역조회
+VERSION          : 1.0
+COMMENT          : 부가세 신고자료 내역조회
+================================================================================
+CHANGE HISTORY
+--------------------------------------------------------------------------------
+DATE        NAME          DESCRIPTION
+----------- ------------  ------------------------------------------------------
+2020-07-16  김일영 최종작성
+================================================================================
+**/
+
+
+/*================================================================================
+PROGRAM NAME     : main_query1
+CREATED BY       : 김일영
+CREATED DATE     : 2020-07-16
+LAST UPDATED BY  : 김일영
+LAST UPDATE DATE :
+PURPOSE          :  부가세 신고자료 내역조회(회계 DB자료)
+VERSION          : 1.0
+COMMENT          :  부가세 신고자료 내역조회(회계 DB자료)
+================================================================================*/
+PROCEDURE main_query1(
+
+       O_CSR            OUT CSR_TYPE,
+       O_ERR            OUT VARCHAR2,
+       V_USERID         IN  VARCHAR2,   -- 필수 : 사용자 아이디
+       V_LANG           IN  VARCHAR2,   -- 필수 : 시스템 언어
+       V_IP             IN  VARCHAR2,   -- 필수 : 사용자 IP
+       p_yyyy           in varchar2,--년도
+       p_quarter        in varchar2 --분기
+       ) IS
+   x_from_date date;
+   x_to_date   date;
+   x_from_month varchar2(2);
+   x_to_month   varchar2(2);
+begin
+   if p_yyyy is null then 
+      o_err :='err 년도가 입력되지 않았습니다';
+      return;
+   end if;
+   if p_quarter is null then
+      o_err :='err 분기가 입력되지 않았습니다';
+      return;
+   end if;
+   
+   x_from_month := lpad(1 + ((to_number(p_quarter) - 1) * 3), 2, '0');
+   x_to_month   := lpad(TO_NUMBER(p_quarter) * 3, 2, '0');
+   x_from_date :=to_date(p_yyyy || x_from_month,'yyyymm');
+   x_to_date   :=to_date(p_yyyy || x_to_month,'yyyymm');
+      
+   --월,울산 공급가액,울산부가세액,양산공급가액,양산부가세
+   open o_csr for
+       
+   select 
+     
+       decode (GROUPING_ID(a.tax_yymm),1,'합계',substr(a.tax_yymm,-2) || '월')  as CM_B100S_T1,
+       sum(decode(a.cm_area,'01',a.supply_amt,0)) as CM_B100S_T2 ,
+       sum(decode(a.cm_area,'01',b.vat_amt,0)) as CM_B100S_T3 ,
+       sum(decode(a.cm_area,'02',a.supply_amt,0)) as CM_B100S_T4,
+       sum(decode(a.cm_area,'02',b.vat_amt,0)) CM_B100S_T5
+   from        
+      (select case when bill_cyc_cd in('02','03','04') and cm_gubun='B' then
+                  charg_yymm
+             else
+                  revenue_yymm
+             end tax_yymm,trim(cm_area) as cm_area,
+             sum(cm_basic_amt+cm_use_amt+cm_exchange_amt) as supply_amt
+      from cm_fgl_summary s
+      where ( bill_cyc_cd in('02','03','04') and  cm_gubun='B' and charg_yymm>=to_char(x_from_date,'yyyymm') and charg_yymm <=to_char(x_to_date,'yyyymm') ) or
+            ( not (bill_cyc_cd in('02','03','04') and cm_gubun='B') and revenue_yymm>=to_char(x_from_date,'yyyymm') and revenue_yymm <=to_char(x_to_date,'yyyymm'))
+            group by case when bill_cyc_cd in('02','03','04') and cm_gubun='B' then
+                  charg_yymm
+             else
+                  revenue_yymm
+             end,cm_area
+      ) a
+
+   ,(      
+      select  case when bill_cyc_cd in('02','03','04')   and cm_gubun='B' then
+                  s.tax_revenue_yymm
+              else
+                  s.revenue_yymm
+              end tax_yymm 
+                ,TRIM(s.cm_area) AS cm_area
+               ,sum(s.cm_vat_amt) as vat_amt
+      from cm_fgl_summary s
+      where (s.bill_cyc_cd in('02','03','04') and s.cm_gubun='B' and s.tax_revenue_yymm >=to_char(x_from_date,'yyyymm') and s.tax_revenue_yymm<=to_char(x_to_date,'yyyymm'))
+      or (not (s.bill_cyc_cd in('02','03','04') and s.cm_gubun='B') and s.sales_fix_dt>=x_from_date and s.sales_fix_dt<=last_day(x_to_date))
+      group by 
+              case when bill_cyc_cd in('02','03','04')   and cm_gubun='B' THEN
+                s.tax_revenue_yymm
+              ELSE
+                s.revenue_yymm
+              end  
+                ,s.cm_area
+         ) b
+   where a.tax_yymm=b.tax_yymm
+   and   a.cm_area=b.cm_area
+   group by rollup(a.tax_yymm)
+         
+         ;
+  
+   
+    
+end;    
+
+/*================================================================================
+PROGRAM NAME     : main_query2
+CREATED BY       : 김일영
+CREATED DATE     : 2020-07-16
+LAST UPDATED BY  : 김일영
+LAST UPDATE DATE :
+PURPOSE          :  부가세 신고자료 내역조회(CCNBDB자료)
+VERSION          : 1.0
+COMMENT          :  부가세 신고자료 내역조회(CCNBDB자료)
+================================================================================*/
+PROCEDURE main_query2(
+
+       O_CSR            OUT CSR_TYPE,
+       O_ERR            OUT VARCHAR2,
+       V_USERID         IN  VARCHAR2,   -- 필수 : 사용자 아이디
+       V_LANG           IN  VARCHAR2,   -- 필수 : 시스템 언어
+       V_IP             IN  VARCHAR2,   -- 필수 : 사용자 IP
+       p_yyyy           in varchar2,--년도
+       p_quarter        in varchar2 --분기
+       ) IS
+   x_from_date date;
+   x_to_date   date;
+   x_from_month varchar2(2);
+   x_to_month   varchar2(2);
+begin
+   if p_yyyy is null then 
+      o_err :='err 년도가 입력되지 않았습니다';
+      return;
+   end if;
+   if p_quarter is null then
+      o_err :='err 분기가 입력되지 않았습니다';
+      return;
+   end if;
+--   x_from_month := lpad((to_number(p_quarter)-1) + 1 ,2,'0');
+--   x_to_month   := lpad((to_number(p_quarter)*3),2,'0');
+   x_from_month := lpad(1 + ((to_number(p_quarter) - 1) * 3), 2, '0');
+   x_to_month   := lpad(TO_NUMBER(p_quarter) * 3, 2, '0');
+   x_from_date :=to_date(p_yyyy || x_from_month,'yyyymm');
+   x_to_date   :=to_date(p_yyyy || x_to_month,'yyyymm');
+   
+   --작성일자,청구년월,사업장,차수,전출여부,수정여부,GL부가세액,BILL부가세액,차이금액
+   open o_csr for
+   
+   
+    select decode(group_id,3,null,substr(cm_stax_yymm,-2) || '월') as CM_B100S_F1,
+           decode(group_id,1,'계',3,'합계',decode(gubun,1,'신고','간이')) as CM_B100S_F2,
+           supply_amt_01 as CM_B100S_F3,
+           vat_amt_01 as CM_B100S_f4,
+           supply_amt_02 as CM_B100S_F5,
+           vat_amt_02 as CM_B100S_F6
+    from 
+    ( select
+              cm_stax_yymm
+             ,decode(a.cm_tax_invoice_yn,'Y',1,2)  as gubun
+             
+            ,sum(decode(trim(a.cm_enp_plc_cd),'01',a.cm_tot_sply_amt,0)) as  supply_amt_01
+            ,sum(decode(trim(a.cm_enp_plc_cd),'01',a.cm_tot_stax,0)) as  vat_amt_01
+            ,sum(decode(trim(a.cm_enp_plc_cd),'02',a.cm_tot_sply_amt,0)) as  supply_amt_02
+           
+            ,sum(decode(trim(a.cm_enp_plc_cd),'02',a.cm_tot_stax,0)) as  vat_amt_02
+           ,GROUPING_ID(a.cm_stax_yymm,decode(a.cm_tax_invoice_yn,'Y',1,2)
+           ) as group_id
+
+     from   cm_btax_invoice a
+
+     where  a.cm_stax_yymm  >=to_char(x_from_date,'yyyymm') and a.cm_stax_yymm <=to_char(x_to_date,'yyyymm')
+     and    a.cm_tax_invoice_yn  in('Y', 'N')
+     
+     group by
+            
+           rollup( a.cm_stax_yymm
+           
+           ,decode(a.cm_tax_invoice_yn,'Y',1,2))
+           ) 
+   
+  
+   ;
+   
+    
+end;   
+/*================================================================================
+PROGRAM NAME     : download1
+CREATED BY       : 
+CREATED DATE     : 2020-08-06
+LAST UPDATED BY  : 
+LAST UPDATE DATE :
+PURPOSE          : 회계DB자료  다운로드
+VERSION          : 1.0
+COMMENT          : 회계DB자료  다운로드
+=======================================================================================*/
+PROCEDURE  download1
+           (
+           O_CSR            OUT CSR_TYPE,
+           V_USERID         IN  VARCHAR2,   -- 필수 : 사용자 아이디
+           V_LANG           IN  VARCHAR2,   -- 필수 : 시스템 언어
+           p_yyyy           in varchar2,--년도
+           p_quarter        in varchar2 --분기
+          ) is
+   x_from_date date;
+   x_to_date   date;
+   x_from_month varchar2(2);
+   x_to_month   varchar2(2);
+begin
+   
+   
+--   x_from_month := lpad((to_number(p_quarter)-1) + 1 ,2,'0');
+--   x_to_month   := lpad((to_number(p_quarter)*3),2,'0');
+   x_from_month := lpad(1 + ((to_number(p_quarter) - 1) * 3), 2, '0');
+   x_to_month   := lpad(TO_NUMBER(p_quarter) * 3, 2, '0');
+   x_from_date :=to_date(p_yyyy || x_from_month,'yyyymm');
+   x_to_date   :=to_date(p_yyyy || x_to_month,'yyyymm');
+   open O_CSR FOR
+   SELECT '월' , '울산공급가액','울산부가세액' , '양산공급가액','양산부가세액' FROM dual
+    UNION ALL
+    /*헤더와 바디를 구분하기 위한 구분자로 정의*/
+    SELECT 'quribody', ''  ,''    ,''    ,''    from dual
+       
+    UNION ALL
+    SELECT         
+           CM_B100S_T1  ||''    AS  CM_B100S_T1
+         , CM_B100S_T2  ||''    AS  CM_B100S_T2
+         , CM_B100S_T3  ||''    AS  CM_B100S_T3
+         , CM_B100S_T4  ||''    AS  CM_B100S_T4
+         , CM_B100S_T5  ||''    AS  CM_B100S_T5
+        
+   from (
+     select 
+     
+            decode (GROUPING_ID(a.tax_yymm),1,'합계',substr(a.tax_yymm,-2) || '월')  as CM_B100S_T1,
+            sum(decode(a.cm_area,'01',a.supply_amt,0)) as CM_B100S_T2 ,
+            sum(decode(a.cm_area,'01',b.vat_amt,0)) as CM_B100S_T3 ,
+            sum(decode(a.cm_area,'02',a.supply_amt,0)) as CM_B100S_T4,
+            sum(decode(a.cm_area,'02',b.vat_amt,0)) CM_B100S_T5
+        from        
+           (select case when bill_cyc_cd in('02','03','04') and cm_gubun='B' then
+                       charg_yymm
+                  else
+                       revenue_yymm
+                  end tax_yymm,trim(cm_area) as cm_area,
+                  sum(cm_basic_amt+cm_use_amt+cm_exchange_amt) as supply_amt
+           from cm_fgl_summary s
+           where ( bill_cyc_cd in('02','03','04') and  cm_gubun='B' and charg_yymm>=to_char(x_from_date,'yyyymm') and charg_yymm <=to_char(x_to_date,'yyyymm') ) or
+                 ( not (bill_cyc_cd in('02','03','04') and cm_gubun='B') and revenue_yymm>=to_char(x_from_date,'yyyymm') and revenue_yymm <=to_char(x_to_date,'yyyymm'))
+                 group by case when bill_cyc_cd in('02','03','04') and cm_gubun='B' then
+                       charg_yymm
+                  else
+                       revenue_yymm
+                  end,cm_area
+           ) a
+
+        ,(      
+           select  case when bill_cyc_cd in('02','03','04')   and cm_gubun='B' then
+                       s.tax_revenue_yymm
+                   else
+                       s.revenue_yymm
+                   end tax_yymm 
+                     ,TRIM(s.cm_area) AS cm_area
+                    ,sum(s.cm_vat_amt) as vat_amt
+           from cm_fgl_summary s
+           where (s.bill_cyc_cd in('02','03','04') and s.cm_gubun='B' and s.tax_revenue_yymm >=to_char(x_from_date,'yyyymm') and s.tax_revenue_yymm<=to_char(x_to_date,'yyyymm'))
+           or (not (s.bill_cyc_cd in('02','03','04') and s.cm_gubun='B') and s.sales_fix_dt>=x_from_date and s.sales_fix_dt<=last_day(x_to_date))
+           group by 
+                   case when bill_cyc_cd in('02','03','04')   and cm_gubun='B' THEN
+                     s.tax_revenue_yymm
+                   ELSE
+                     s.revenue_yymm
+                   end  
+                     ,s.cm_area
+              ) b
+        where a.tax_yymm=b.tax_yymm
+        and   a.cm_area=b.cm_area
+        group by rollup(a.tax_yymm));      
+end;         
+
+
+/*================================================================================
+PROGRAM NAME     : download2
+CREATED BY       : 
+CREATED DATE     : 2020-08-06
+LAST UPDATED BY  : 
+LAST UPDATE DATE :
+PURPOSE          : CCNB자료  다운로드
+VERSION          : 1.0
+COMMENT          : CCNB자료  다운로드
+=======================================================================================*/
+PROCEDURE  download2
+           (
+           O_CSR            OUT CSR_TYPE,
+           V_USERID         IN  VARCHAR2,   -- 필수 : 사용자 아이디
+           V_LANG           IN  VARCHAR2,   -- 필수 : 시스템 언어
+           p_yyyy           in varchar2,--년도
+           p_quarter        in varchar2 --분기
+          ) is
+   x_from_date date;
+   x_to_date   date;
+   x_from_month varchar2(2);
+   x_to_month   varchar2(2);
+begin
+   
+   
+--   x_from_month := lpad((to_number(p_quarter)-1) + 1 ,2,'0');
+--   x_to_month   := lpad((to_number(p_quarter)*3),2,'0');
+   x_from_month := lpad(1 + ((to_number(p_quarter) - 1) * 3), 2, '0');
+   x_to_month   := lpad(TO_NUMBER(p_quarter) * 3, 2, '0');
+   x_from_date :=to_date(p_yyyy || x_from_month,'yyyymm');
+   x_to_date   :=to_date(p_yyyy || x_to_month,'yyyymm');
+   open O_CSR FOR
+   SELECT '월' , '구분','울산공급가액','울산부가세액' , '양산공급가액','양산부가세액' FROM dual
+    UNION ALL
+    /*헤더와 바디를 구분하기 위한 구분자로 정의*/
+    SELECT 'quribody','', ''  ,''    ,''    ,''    from dual
+       
+    UNION ALL
+    SELECT         
+           CM_B100S_T1  ||''    AS  CM_B100S_T1
+         , CM_B100S_T2  ||''    AS  CM_B100S_T2
+         , CM_B100S_T3  ||''    AS  CM_B100S_T3
+         , CM_B100S_T4  ||''    AS  CM_B100S_T4
+         , CM_B100S_T5  ||''    AS  CM_B100S_T5
+         , CM_B100S_T6  ||''    AS  CM_B100S_T6
+        
+   from (
+     select decode(group_id,3,null,substr(cm_stax_yymm,-2) || '월') as CM_B100S_T1,
+           decode(group_id,1,'계',3,'합계',decode(gubun,1,'신고','간이')) as CM_B100S_T2,
+           supply_amt_01 as CM_B100S_T3,
+           vat_amt_01 as CM_B100S_T4,
+           supply_amt_02 as CM_B100S_T5,
+           vat_amt_02 as CM_B100S_T6
+    from 
+    ( select
+              cm_stax_yymm
+             ,decode(a.cm_tax_invoice_yn,'Y',1,2)  as gubun
+             
+            ,sum(decode(trim(a.cm_enp_plc_cd),'01',a.cm_tot_sply_amt,0)) as  supply_amt_01
+            ,sum(decode(trim(a.cm_enp_plc_cd),'01',a.cm_tot_stax,0)) as  vat_amt_01
+            ,sum(decode(trim(a.cm_enp_plc_cd),'02',a.cm_tot_sply_amt,0)) as  supply_amt_02
+           
+            ,sum(decode(trim(a.cm_enp_plc_cd),'02',a.cm_tot_stax,0)) as  vat_amt_02
+           ,GROUPING_ID(a.cm_stax_yymm,decode(a.cm_tax_invoice_yn,'Y',1,2)
+           ) as group_id
+
+     from   cm_btax_invoice a
+
+     where  a.cm_stax_yymm  >=to_char(x_from_date,'yyyymm') and a.cm_stax_yymm <=to_char(x_to_date,'yyyymm')
+     and    a.cm_tax_invoice_yn  in('Y', 'N')
+     
+     group by
+            
+           rollup( a.cm_stax_yymm
+           
+           ,decode(a.cm_tax_invoice_yn,'Y',1,2))
+           ) );      
+end;                 
+END ;
