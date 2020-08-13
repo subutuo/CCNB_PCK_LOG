@@ -1,0 +1,418 @@
+
+  CREATE OR REPLACE PACKAGE "CISADM"."CM_B913S_PKG" IS
+TYPE CSR_TYPE IS REF CURSOR;
+/**
+================================================================================
+PROGRAM NAME     : CM_B913S_PKG
+CREATED BY       : 김일영
+CREATED DATE     : 2020-07-16
+LAST UPDATED BY  : 김일영
+LAST UPDATE DATE :
+PURPOSE          :  합산세대 납부자에 대한 부가세정보 관리
+VERSION          : 1.0
+COMMENT          : 합산세대 납부자에 대한 부가세정보 관리
+================================================================================
+CHANGE HISTORY
+--------------------------------------------------------------------------------
+DATE        NAME          DESCRIPTION
+----------- ------------  ------------------------------------------------------
+2012-01-17  김일영 최종작성
+================================================================================
+**/
+
+
+/*================================================================================
+PROGRAM NAME     : main_query
+CREATED BY       : 김일영
+CREATED DATE     : 2020-07-16
+LAST UPDATED BY  : 김일영
+LAST UPDATE DATE :
+PURPOSE          :  합산세대 납부자에 대한 부가세정보 조회(리스트)
+VERSION          : 1.0
+COMMENT          :  합산세대 납부자에 대한 부가세정보 조회(리스트)
+================================================================================*/
+PROCEDURE main_query(
+
+       O_CSR            OUT CSR_TYPE,
+       O_ERR            OUT VARCHAR2,
+       V_USERID         IN  VARCHAR2,   -- 필수 : 사용자 아이디
+       V_LANG           IN  VARCHAR2,   -- 필수 : 시스템 언어
+       V_IP             IN  VARCHAR2,   -- 필수 : 사용자 IP
+       p_hapsan_acct_id      IN  CHAR,--합산납부번호
+       p_biz_reg        IN VARCHAR2, --사업자등록번호
+       p_trade_nm       IN VARCHAR2  --상호
+         
+       ) ;
+/*================================================================================
+PROGRAM NAME     : sub_query
+CREATED BY       : 김일영
+CREATED DATE     : 2020-07-16
+LAST UPDATED BY  : 김일영
+LAST UPDATE DATE :
+PURPOSE          : 합산세대 가세정보등록 요청에 대한 조회(리스트클릭시)
+VERSION          : 1.0
+COMMENT          : 합산세대 가세정보등록 요청에 대한 조회(리스트클릭시)
+================================================================================*/
+PROCEDURE sub_query(
+
+       O_CSR            OUT CSR_TYPE,
+       O_ERR            OUT VARCHAR2,
+       V_USERID         IN  VARCHAR2,   -- 필수 : 사용자 아이디
+       V_LANG           IN  VARCHAR2,   -- 필수 : 시스템 언어
+       V_IP             IN  VARCHAR2,   -- 필수 : 사용자 IP
+       p_acct_id        IN VARCHAR2--합산납부번호  
+       );       
+
+/*================================================================================
+PROGRAM NAME     : tax_cust
+CREATED BY       : 김일영
+CREATED DATE     : 2014-08-21
+LAST UPDATED BY  : 김일영
+LAST UPDATE DATE :
+PURPOSE          : 접수된 건에 대해 부사게 신청정보를 Insert하고 신청정보를 완료한다.
+VERSION          : 1.0
+COMMENT          : 접수된 건에 대해 부사게 신청정보를 Insert하고 신청정보를 완료한다.
+
+
+
+
+=======================================================================================*/
+procedure tax_cust
+           (
+             O_CSR         OUT CSR_TYPE
+           , O_ERR OUT VARCHAR2
+           , V_USERID      IN  VARCHAR2   -- 필수 : 사용자 아이디
+           , V_LANG        IN  VARCHAR2   -- 필수 : 시스템 언어
+           , V_IP          IN  VARCHAR2   -- 필수 : 사용자 IP
+           , p_acct_id      in  char  -- 납부자
+           , p_cm_biz_reg_no      in  char    --사업자등록번호 
+           , p_cm_trade_nm        in  varchar    --상호 
+           , p_cm_biz_gubun       in  char        --사업자구분(10:개인/20:법인) 
+           , p_cm_jumincorp_no    in  char    --법인/주민등록번호
+               
+           , p_cm_ind_type        in  varchar            --업종 
+           , p_cm_biz_conditions  in  char            --업태 
+           , p_cm_rptv            in  varchar            --대표자 
+           , p_cm_rptv_tel        in  varchar            --대표자 연락처 
+             
+           , p_cm_biz_tel         in  varchar            --사업장 전화 
+           , p_cm_biz_fax         in  varchar            --사업장 팩스 
+           , p_cm_rptv_addr       in  varchar            --대표자 주소 
+           , p_cm_corporate_nm    in  varchar            --법인명 
+           , p_cm_biz_begin_dt    in  varchar            --사업개시일 
+           , p_cm_biz_addr_yn     in  char            --사업장소재지의 주소사용여부 
+           , p_cm_tax_invoice_yn  in  char               --부가세신고대상여부 p
+           , p_cm_biz_address     in  varchar            --사업장소재지(부가세주소) 
+           , p_cm_hq_address      in  varchar            --본점소재지 
+
+           , p_buyer_name         in  varchar            --공급받는자담당자명 
+           , p_buyer_fax          in  varchar            --공급받는자fax번호 
+           , p_buyer_email        in  varchar            --공급받는자담당자이메일 
+           , p_buyer_tel          in  varchar            --공급받는자담당자전화번호 
+           , p_buyer_mobile       in  varchar            --공급받는자담당자휴대폰번호 
+           , p_cm_terminate_dt    in  varchar            --해지일 
+           --, v_cm_terminate_id    in  varchar            --해지자 
+           , p_buyr_code          in  char 
+ --, v_cust_cl_cd         IN  CHAR    
+);      
+             
+
+                                                                                                                                          
+END ;
+
+CREATE OR REPLACE PACKAGE BODY "CISADM"."CM_B913S_PKG" IS
+/**
+================================================================================
+PROGRAM NAME     : CM_B913S_PKG
+CREATED BY       : 김일영
+CREATED DATE     : 2020-07-16
+LAST UPDATED BY  : 김일영
+LAST UPDATE DATE :
+PURPOSE          :  합산세대 납부자에 대한 부가세정보 관리
+VERSION          : 1.0
+COMMENT          : 합산세대 납부자에 대한 부가세정보 관리
+================================================================================
+CHANGE HISTORY
+--------------------------------------------------------------------------------
+DATE        NAME          DESCRIPTION
+----------- ------------  ------------------------------------------------------
+2012-01-17  김일영 최종작성
+================================================================================
+**/
+
+
+/*================================================================================
+PROGRAM NAME     : main_query
+CREATED BY       : 김일영
+CREATED DATE     : 2020-07-16
+LAST UPDATED BY  : 김일영
+LAST UPDATE DATE :
+PURPOSE          :  합산세대 납부자에 대한 부가세정보 조회(리스트)
+VERSION          : 1.0
+COMMENT          :  합산세대 납부자에 대한 부가세정보 조회(리스트)
+================================================================================*/
+PROCEDURE main_query(
+
+       O_CSR            OUT CSR_TYPE,
+       O_ERR            OUT VARCHAR2,
+       V_USERID         IN  VARCHAR2,   -- 필수 : 사용자 아이디
+       V_LANG           IN  VARCHAR2,   -- 필수 : 시스템 언어
+       V_IP             IN  VARCHAR2,   -- 필수 : 사용자 IP
+       p_hapsan_acct_id      IN  CHAR,--합산납부번호
+       p_biz_reg        IN VARCHAR2, --사업자등록번호
+       p_trade_nm       IN VARCHAR2  --상호
+         
+       ) IS
+   
+begin
+  
+   
+   --합산납부번호,차분,납부자명,상호,사업자등록번호,대표자명,업태,업종,부가세여부,주소,전입일
+   open o_csr for
+   select 
+           acct.acct_id       as CM_B100S_T1--합산납부번호
+          ,acct.bill_cyc_cd   as CM_B100S_T2 --차분
+          ,acct.entity_name as CM_B100S_T3--납부자명
+          ,bci.cm_trade_nm as CM_B100S_T4--상호
+          ,REGEXP_REPLACE(bci.cm_biz_reg_no, '([0-9]{3})([0-9]{2})([0-9]{5})', '\1-\2-\3')  as CM_B100S_T5--사업자등록번호
+          ,bci.cm_rptv as CM_B100S_T6--대표자명
+          ,clv.descr as CM_B100S_T7--업태
+          ,bci.cm_ind_type as CM_B100S_T8 --업종
+          ,bci.cm_tax_invoice_yn as CM_B100S_T9 --부가세여부
+          ,TRIM(PREM.GEO_CODE)||' '|| TRIM(PREM.ADDRESS1)                       
+                         ||' '|| TRIM(PREM.ADDRESS4)||' '|| TRIM(PREM.NUM1)                   
+                         || DECODE( TRIM(PREM.NUM2), '', '', '-'|| TRIM(PREM.NUM2))     
+                         ||' '|| CPC.ADHOC_CHAR_VAL               as CM_B100S_T10 --*납부자주소
+          ,to_char(setup_dt, 'yyyy-mm-dd') as CM_B100S_T11--전입일
+         
+   from  ci_acct acct
+        ,ci_prem prem
+        ,ci_prem_char cpc
+        ,cm_btax_cust_info bci
+        ,ci_lookup_val_l clv
+   where  acct.acct_id=bci.acct_id
+   and    acct.mailing_prem_id=prem.prem_id(+)
+   and    prem.prem_id=cpc.prem_id(+)
+   and    cpc.char_type_cd(+)='CM_HO_NM'
+   and    bci.cm_biz_conditions=clv.field_value
+   and    clv.field_name='CM_BIZ_TYPE'
+   and    clv.language_cd=V_LANG
+   and    exists (select 1 from cm_psum_bills_house where acct.acct_id=as_is_hapsan_acct_id)
+   and    acct.acct_id=nvl(p_hapsan_acct_id,acct.acct_id)
+   and    (p_biz_reg is null or bci.cm_biz_reg_no like p_biz_reg || '%')
+   and    (p_trade_nm is null or bci.cm_trade_nm like  p_trade_nm || '%');
+        
+   
+   
+       
+   
+
+    
+    
+end;    
+
+
+/*================================================================================
+PROGRAM NAME     : sub_query
+CREATED BY       : 김일영
+CREATED DATE     : 2020-07-16
+LAST UPDATED BY  : 김일영
+LAST UPDATE DATE :
+PURPOSE          : 합산세대 가세정보등록 요청에 대한 조회(리스트클릭시)
+VERSION          : 1.0
+COMMENT          : 합산세대 가세정보등록 요청에 대한 조회(리스트클릭시)
+================================================================================*/
+PROCEDURE sub_query(
+
+       O_CSR            OUT CSR_TYPE,
+       O_ERR            OUT VARCHAR2,
+       V_USERID         IN  VARCHAR2,   -- 필수 : 사용자 아이디
+       V_LANG           IN  VARCHAR2,   -- 필수 : 시스템 언어
+       V_IP             IN  VARCHAR2,   -- 필수 : 사용자 IP
+       p_acct_id        IN VARCHAR2--합산납부번호  
+       ) IS
+   
+begin
+  
+   --x_pre_from_date :=add_months(to_date(replace(p_yyyymm,'-',''),'YYYYMM'),-1);
+   --x_param := v_userid || ':' || v_lang || ':' || v_ip || ':' || p_cm_charg_yymm || ':' || p_bill_cycle ;  
+   --접수일자,접수구분,납부번호,납부자명,처리상태,첨부파일,비고,처리일시,처리자명
+   open o_csr for
+               
+   SELECT 
+       a.acct_id                   CM_B100S_F1     --납부자번호 
+     , acct.entity_name            CM_B100S_F2     -- 납부자 명         
+     , acct.f5                     CM_B100S_F3     -- 납부자 주소   
+     , a.cm_biz_gubun              CM_B100S_F4     --사업자구분(10:개인/20:법인) 
+     , a.cm_personal_no            CM_B100S_F5     --주민번호 
+     , a.cm_corporate_no           CM_B100S_F6     --법인등록번호 
+     , a.cm_biz_reg_no             CM_B100S_F7     --사업자등록번호 
+     , a.cm_trade_nm               CM_B100S_F8     --상호 
+     , a.cm_corporate_nm           CM_B100S_F9     --법인명 
+     , a.cm_rptv                   CM_B100S_F10     --대표자 
+     , a.cm_rptv_addr              CM_B100S_F11     --대표자 주소 
+     , a.cm_rptv_tel               CM_B100S_F12     --대표자 연락처 
+     , a.cm_biz_conditions         CM_B100S_F13     --업태 
+     ,( SELECT DESCR FROM CI_LOOKUP
+          WHERE FIELD_NAME = 'CM_BIZ_TYPE'
+            AND LANGUAGE_CD = V_LANG
+            AND OWNER_FLG = 'CM' AND  TRIM(FIELD_VALUE) = trim(a.CM_BIZ_CONDITIONS) )  CM_B100S_F14       --    AS 업태
+     , a.cm_ind_type               CM_B100S_F15     --업종 
+     , a.cm_biz_tel                CM_B100S_F16     --사업장 전화 
+     , a.cm_biz_fax                CM_B100S_F17     --사업장 팩스 
+     , to_char(a.cm_biz_begin_dt,'yyyy-mm-dd')     CM_B100S_F18     --사업개시일 
+     , a.cm_biz_addr_yn            CM_B100S_F19     --사업장소재지의 주소사용여부 
+     , a.cm_biz_address            CM_B100S_F20     --사업장소재지(부가세주소) 
+     , a.cm_hq_address             CM_B100S_F21     --본점소재지 
+     , a.buyr_code                 CM_B100S_F22     --종사업장번호(32.공급받는자거래처코드:사업자단위과세제도에 따라 국세청에서 부여한 코드) 
+     , to_char(a.cm_terminate_dt,'yyyy-mm-dd')     CM_B100S_F23     --해지일 
+     , a.cm_terminate_id           CM_B100S_F24     --해지자 
+     , a.cm_tax_invoice_yn         CM_B100S_F25     --부가세신고대상여부 
+     , a.buyer_fax                 CM_B100S_F26     --공급받는자FAX번호 
+     , a.buyer_name                CM_B100S_F27     --공급받는자담당자명 
+     , a.buyer_tel                 CM_B100S_F28     --공급받는자담당자전화번호 
+     , a.buyer_mobile              CM_B100S_F29     --공급받는자담당자휴대폰번호 
+     , a.buyer_email               CM_B100S_F30     --공급받는자담당자이메일 
+     , acct.bill_cyc_cd               CM_B100S_F31      --  AS 차분
+     , trim(acct.cust_cl_cd)          CM_B100S_F32      --  IND 구분
+   FROM 
+       CM_BTAX_CUST_INFO A
+  --  , cm_btax_ebill_info b
+    , ( SELECT ACCT.ACCT_ID 
+             ,acct.bill_cyc_cd
+             ,acct.cust_cl_cd
+             ,acct.entity_name
+             /*, ACCT_PER.ACCT_ID    F1
+             , PNAME.ENTITY_NAME   
+             , PER_ID.PER_ID_NBR   F3
+             , ACCT_PER.PER_ID     F4*/
+             , TRIM(PREM.GEO_CODE)||' '|| TRIM(PREM.ADDRESS1)                       
+                   ||' '|| TRIM(PREM.ADDRESS4)||' '|| TRIM(PREM.NUM1)                   
+                   || DECODE( TRIM(PREM.NUM2), '', '', '-'|| TRIM(PREM.NUM2))     
+                   ||' '|| PHONM.ADHOC_CHAR_VAL               AS F5 --*도로명주소
+          FROM CI_ACCT ACCT
+             , CI_PREM PREM
+             , ( SELECT PREM_ID, ADHOC_CHAR_VAL FROM CI_PREM_CHAR WHERE CHAR_TYPE_CD = 'CM_HO_NM' ) PHONM
+         WHERE ACCT.MAILING_PREM_ID = PREM.PREM_ID
+           AND PREM.PREM_ID = PHONM.PREM_ID
+           AND ACCT.ACCT_ID = p_acct_id
+           
+      ) ACCT
+   WHERE A.ACCT_ID = ACCT.ACCT_ID(+)
+   AND A.ACCT_ID = p_acct_id
+ --C.MAILING_PREM_ID = F.PREM_ID
+;
+   
+
+       
+   
+
+    
+    
+end;    
+
+
+
+
+/*================================================================================
+PROGRAM NAME     : tax_cust
+CREATED BY       : 김일영
+CREATED DATE     : 2014-08-21
+LAST UPDATED BY  : 김일영
+LAST UPDATE DATE :
+PURPOSE          : 접수된 건에 대해 부사게 신청정보를 Insert하고 신청정보를 완료한다.
+VERSION          : 1.0
+COMMENT          : 접수된 건에 대해 부사게 신청정보를 Insert하고 신청정보를 완료한다.
+
+
+
+
+=======================================================================================*/
+procedure tax_cust
+           (
+             O_CSR         OUT CSR_TYPE
+           , O_ERR OUT VARCHAR2
+           , V_USERID      IN  VARCHAR2   -- 필수 : 사용자 아이디
+           , V_LANG        IN  VARCHAR2   -- 필수 : 시스템 언어
+           , V_IP          IN  VARCHAR2   -- 필수 : 사용자 IP
+           , p_acct_id      in  char  -- 납부자
+           , p_cm_biz_reg_no      in  char    --사업자등록번호 
+           , p_cm_trade_nm        in  varchar    --상호 
+           , p_cm_biz_gubun       in  char        --사업자구분(10:개인/20:법인) 
+           , p_cm_jumincorp_no    in  char    --법인/주민등록번호
+               
+           , p_cm_ind_type        in  varchar            --업종 
+           , p_cm_biz_conditions  in  char            --업태 
+           , p_cm_rptv            in  varchar            --대표자 
+           , p_cm_rptv_tel        in  varchar            --대표자 연락처 
+             
+           , p_cm_biz_tel         in  varchar            --사업장 전화 
+           , p_cm_biz_fax         in  varchar            --사업장 팩스 
+           , p_cm_rptv_addr       in  varchar            --대표자 주소 
+           , p_cm_corporate_nm    in  varchar            --법인명 
+           , p_cm_biz_begin_dt    in  varchar            --사업개시일 
+           , p_cm_biz_addr_yn     in  char            --사업장소재지의 주소사용여부 
+           , p_cm_tax_invoice_yn  in  char               --부가세신고대상여부 p
+           , p_cm_biz_address     in  varchar            --사업장소재지(부가세주소) 
+           , p_cm_hq_address      in  varchar            --본점소재지 
+
+           , p_buyer_name         in  varchar            --공급받는자담당자명 
+           , p_buyer_fax          in  varchar            --공급받는자fax번호 
+           , p_buyer_email        in  varchar            --공급받는자담당자이메일 
+           , p_buyer_tel          in  varchar            --공급받는자담당자전화번호 
+           , p_buyer_mobile       in  varchar            --공급받는자담당자휴대폰번호 
+           , p_cm_terminate_dt    in  varchar            --해지일 
+           --, v_cm_terminate_id    in  varchar            --해지자 
+           , p_buyr_code          in  char 
+ --, v_cust_cl_cd         IN  CHAR    
+)
+IS
+
+
+   x_term_date DATE;
+BEGIN
+
+
+
+IF p_cm_terminate_dt IS NULL THEN 
+   x_term_date := NULL;
+ELSE
+   x_term_date := to_date(replace(p_cm_terminate_dt,'-',''),'YYYYMMDD');
+END IF;
+
+
+  UPDATE cm_btax_cust_info  SET
+       cm_biz_gubun                    = p_cm_biz_gubun                   /*사업자구분(10:개인/20:법인)*/
+       , cm_corporate_no               = replace(p_cm_jumincorp_no,'-','')                /*법인등록번호*/
+       , cm_biz_reg_no                 = p_cm_biz_reg_no                  /*사업자등록번호*/
+       , cm_trade_nm                   = p_cm_trade_nm                    /*상호*/
+       , cm_corporate_nm               = p_cm_corporate_nm                /*법인명*/
+       , cm_rptv                       = p_cm_rptv                        /*대표자*/
+       , cm_rptv_addr                  = p_cm_rptv_addr                   /*대표자 주소*/
+       , cm_rptv_tel                   = p_cm_rptv_tel                    /*대표자 연락처*/
+       , cm_biz_conditions             = p_cm_biz_conditions              /*업태*/
+       , cm_ind_type                   = p_cm_ind_type                    /*업종*/
+       , cm_biz_tel                    = p_cm_biz_tel                     /*사업장 전화*/
+       , cm_biz_fax                    = p_cm_biz_fax                     /*사업장 팩스*/
+       , cm_biz_begin_dt               = to_date(replace(trim(p_cm_biz_begin_dt),'-',''),'YYYYMMDD')                /*사업개시일*/
+       , cm_biz_addr_yn                = NVL(p_cm_biz_addr_yn,'Y')                 /*사업장소재지의 주소사용여부*/
+       , cm_biz_address                = p_cm_biz_address                 /*사업장소재지(부가세주소)*/
+       , cm_hq_address                 = p_cm_hq_address                  /*본점소재지*/
+       , buyr_code                     = p_buyr_code                      /*종사업장번호(32.공급받는자거래처코드:사업자단위과세제도에 따라 국세청에서 부여한 코드)*/
+       , cm_terminate_dt               = x_term_date                /*해지일*/
+       , cm_terminate_id               = (SELECT CASE WHEN x_term_date IS NULL THEN NULL ELSE V_USERID END FROM dual) /*해지자*/
+       , cm_tax_invoice_yn             = p_cm_tax_invoice_yn              /*부가세신고대상여부*/
+       , buyer_fax                     = p_buyer_fax                      /*공급받는자FAX번호*/
+       , buyer_name                    = p_buyer_name                     /*공급받는자담당자명*/
+       , buyer_tel                     = p_buyer_tel                      /*공급받는자담당자전화번호*/
+       , buyer_mobile                  = p_buyer_mobile                   /*공급받는자담당자휴대폰번호*/
+       , buyer_email                   = p_buyer_email                    /*공급받는자담당자이메일*/
+       , cm_updated_id                 = V_USERID                  
+       , cm_updated_dttm               = SYSDATE         
+   WHERE acct_id                       = p_acct_id                        /*납부자번호*/
+   ;
+end;   
+
+
+         
+END ;
